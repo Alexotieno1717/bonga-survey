@@ -33,9 +33,10 @@ import { ArrowDown, ChevronDown, Download } from 'lucide-react';
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
     data: TData[]
+    filterColumn?: keyof TData | null
 }
 
-export function DataTable<TData, TValue>({ columns, data, }: DataTableProps<TData, TValue>) {
+export function DataTable<TData, TValue>({ columns, data, filterColumn }: DataTableProps<TData, TValue>) {
 
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
@@ -91,14 +92,24 @@ export function DataTable<TData, TValue>({ columns, data, }: DataTableProps<TDat
         <div>
             {/* filter data */}
             <div className="flex items-center py-4 space-x-2">
-                <Input
-                    placeholder="Filter Names..."
-                    value={(table.getColumn("names")?.getFilterValue() as string) ?? ""}
-                    onChange={(event) =>
-                        table.getColumn("names")?.setFilterValue(event.target.value)
-                    }
-                    className="max-w-sm"
-                />
+                {filterColumn && (
+                    <Input
+                        placeholder={`Filter ${String(filterColumn)}...`}
+                        value={(table.getColumn(String(filterColumn))?.getFilterValue() as string) ?? ""}
+                        onChange={(event) =>
+                            table.getColumn(String(filterColumn))?.setFilterValue(event.target.value)
+                        }
+                        className="max-w-sm"
+                    />
+                )}
+                {/*<Input*/}
+                {/*    placeholder="Filter Names..."*/}
+                {/*    value={(table.getColumn("names")?.getFilterValue() as string) ?? ""}*/}
+                {/*    onChange={(event) =>*/}
+                {/*        table.getColumn("names")?.setFilterValue(event.target.value)*/}
+                {/*    }*/}
+                {/*    className="max-w-sm"*/}
+                {/*/>*/}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="outline" className="ml-auto cursor-pointer">
@@ -174,7 +185,7 @@ export function DataTable<TData, TValue>({ columns, data, }: DataTableProps<TDat
                         ) : (
                             <TableRow>
                                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                                    No results.
+                                    No results found.
                                 </TableCell>
                             </TableRow>
                         )}

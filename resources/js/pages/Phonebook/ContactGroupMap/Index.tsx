@@ -85,7 +85,7 @@ export default function Index() {
                         </div>
 
                         <div className="py-2">
-                            <DataTable<ContactGroupMapProps, any> columns={columns} data={contactgroupmaps} />
+                            <DataTable<ContactGroupMapProps, any> columns={columns} data={contactgroupmaps} filterColumn="group" />
                         </div>
                     </>
 

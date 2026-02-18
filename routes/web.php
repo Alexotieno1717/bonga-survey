@@ -23,13 +23,3 @@ Route::get('phonebook/contactgroup', [contactgroupController::class, 'index'])->
 Route::get('phonebook/contactgroupmaps', [\App\Http\Controllers\Phonebook\ContactGroupMapController::class, 'index'])->name('contactgroupmaps.index')->middleware(['auth']);
 
 require __DIR__.'/settings.php';
-
-
-
-//Route::prefix('phonebook')->name('phonebook.')->group(function () {
-//
-//    Route::resource('contacts', ContactController::class);
-//    Route::resource('groups', ContactGroupController::class);
-//    Route::resource('group-maps', ContactGroupMapController::class);
-//
-//});

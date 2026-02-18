@@ -100,7 +100,7 @@ export default function Index() {
 
                 ) : (
                     <div className="py-2">
-                        <DataTable<ContactProps, any> columns={columns} data={contacts} />
+                        <DataTable<ContactProps, any> columns={columns} data={contacts} filterColumn="names" />
                     </div>
                 )}
             </div>
