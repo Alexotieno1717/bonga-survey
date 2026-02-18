@@ -30,6 +30,8 @@ import questions from '@/routes/questions';
 import type { NavItem } from '@/types';
 import AppLogo from './app-logo';
 import contact from '@/routes/contact';
+import contactgroup from '@/routes/contactgroup';
+import contactgroupmaps from '@/routes/contactgroupmaps';
 
 const mainNavItems: NavItem[] = [
     {
@@ -71,12 +73,12 @@ const mainNavItems: NavItem[] = [
             },
             {
                 title: 'Contact Groups',
-                href: '/surveys/ai',
+                href: contactgroup.index(),
                 icon: User,
             },
             {
                 title: 'Contact Group Maps',
-                href: '/surveys/responses',
+                href: contactgroupmaps.index(),
                 icon: MapPin,
             },
         ],

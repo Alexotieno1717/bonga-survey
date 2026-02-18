@@ -101,7 +101,7 @@ export function DataTable<TData, TValue>({ columns, data, }: DataTableProps<TDat
                 />
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="ml-auto">
+                        <Button variant="outline" className="ml-auto cursor-pointer">
                             Filter Columns
                             <ChevronDown />
                         </Button>
@@ -130,7 +130,7 @@ export function DataTable<TData, TValue>({ columns, data, }: DataTableProps<TDat
                     </DropdownMenuContent>
                 </DropdownMenu>
                 <div>
-                    <Button onClick={exportToCSV}>
+                    <Button onClick={exportToCSV} className="cursor-pointer">
                         Download Data
                         <Download />
                     </Button>

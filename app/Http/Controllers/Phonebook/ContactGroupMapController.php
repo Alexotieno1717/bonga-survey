@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Phonebook;
 use App\Http\Controllers\Controller;
 use App\Models\ContactGroupMap;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class ContactGroupMapController extends Controller
 {
@@ -13,7 +14,9 @@ class ContactGroupMapController extends Controller
      */
     public function index()
     {
-        //
+        return Inertia::render('Phonebook/ContactGroupMap/Index', [
+            'contactgroupmaps' => ContactGroupMap::all(),
+        ]);
     }
 
     /**
