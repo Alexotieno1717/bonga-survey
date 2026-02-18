@@ -52,4 +52,15 @@ class User extends Authenticatable
             'two_factor_confirmed_at' => 'datetime',
         ];
     }
+
+    public function contacts(): User|\Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Contact::class);
+    }
+
+    public function contactGroups(): User|\Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ContactGroup::class);
+    }
+
 }

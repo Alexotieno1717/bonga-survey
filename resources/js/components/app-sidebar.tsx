@@ -1,5 +1,18 @@
 import { Link } from '@inertiajs/react';
-import { BookOpen, Folder, LayoutGrid } from 'lucide-react';
+import {
+    BookOpen,
+    BookUser,
+    Brain,
+    FileText,
+    Folder,
+    LayoutGrid,
+    ListTodo,
+    MapPin,
+    MessageSquare,
+    User,
+    User2,
+    Users,
+} from 'lucide-react';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -13,14 +26,60 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import questions from '@/routes/questions';
 import type { NavItem } from '@/types';
 import AppLogo from './app-logo';
+import contact from '@/routes/contact';
 
 const mainNavItems: NavItem[] = [
     {
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
+    },
+    {
+        title: 'Survey',
+        href: '',
+        icon: ListTodo,
+        children: [
+            {
+                title: 'Survey Questions',
+                href: questions.index(),
+                icon: FileText,
+            },
+            {
+                title: 'AI Survey',
+                href: '/surveys/ai',
+                icon: Brain,
+            },
+            {
+                title: 'Survey Responses',
+                href: '/surveys/responses',
+                icon: MessageSquare,
+            },
+        ],
+    },
+    {
+        title: 'Phonebook',
+        href: '',
+        icon: BookUser,
+        children: [
+            {
+                title: 'Contact Groups',
+                href: contact.index(),
+                icon: Users,
+            },
+            {
+                title: 'Contacts',
+                href: '/surveys/ai',
+                icon: User,
+            },
+            {
+                title: 'Contact Group Maps',
+                href: '/surveys/responses',
+                icon: MapPin,
+            },
+        ],
     },
 ];
 

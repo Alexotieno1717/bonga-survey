@@ -2,6 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Models\Contact;
+use App\Models\ContactGroup;
+use App\Models\ContactGroupMap;
 use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -15,9 +18,27 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        User::factory(3)->create()->each(function ($user) {
+
+            $groups = ContactGroup::factory(5)->create([
+                'user_id' => $user->id,
+            ]);
+
+            $contacts = Contact::factory(20)->create([
+                'user_id' => $user->id,
+            ]);
+
+            foreach ($contacts as $contact) {
+                $group = $groups->random();
+
+                ContactGroupMap::factory()->create([
+                    'user_id' => $user->id,
+                    'contact_id' => $contact->id,
+                    'contact_group_id' => $group->id,
+                    'group' => $group->name,
+                    'phone' => $contact->phone,
+                ]);
+            }
+        });
     }
 }
