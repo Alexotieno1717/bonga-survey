@@ -59,7 +59,7 @@ export default function Index() {
                             </div>
 
                             <div className="flex items-end justify-end space-x-3 pt-[17px]">
-                                <Button variant={'outline'}>Reset</Button>
+                                <Button variant='outline'>Reset</Button>
                                 <Button>Search</Button>
                                 <Link href={questions.create().url}>
                                     <Button>Create Survey Question</Button>

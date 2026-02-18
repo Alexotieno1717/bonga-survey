@@ -6,6 +6,9 @@ import { dashboard } from '@/routes';
 import contact from '@/routes/contact';
 import NotFound from '@/components/NotFound';
 import { Button } from '@/components/ui/button';
+import { DataTable } from '@/components/DataTable';
+import { ColumnDef } from '@tanstack/react-table';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface Contact {
     id: number;
@@ -24,16 +27,65 @@ const breadcrumbs: BreadcrumbItem[] = [
 export default function Index() {
     const { contacts } = usePage().props as { contacts: Contact [] };
 
+    const columns: ColumnDef<Contact>[] = [
+        {
+            id: "select",
+            header: ({ table }) => (
+                <Checkbox
+                    checked={
+                        table.getIsAllPageRowsSelected() ||
+                        (table.getIsSomePageRowsSelected() && "indeterminate")
+                    }
+                    onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+                    aria-label="Select all"
+                />
+            ),
+            cell: ({ row }) => (
+                <Checkbox
+                    checked={row.getIsSelected()}
+                    onCheckedChange={(value) => row.toggleSelected(!!value)}
+                    aria-label="Select row"
+                />
+            ),
+            enableSorting: false,
+            enableHiding: false,
+        },
+        {
+            accessorKey: "names",
+            header: "Names",
+        },
+        {
+            accessorKey: "email",
+            header: "Email",
+        },
+        {
+            accessorKey: "phone",
+            header: "Phone",
+        },
+        {
+            accessorKey: "gender",
+            header: "Gender",
+        },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Dashboard" />
+            <Head title="Contacts" />
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+
+                {/* HEADER */}
+                <div className="flex justify-between">
+                    <h1 className="text-3xl leading-10 font-semibold">
+                        Manage Survey Questions
+                    </h1>
+                </div>
 
                 <div className="px-6 pb-6 border-b border-gray-200">
                     <div className="flex items-end justify-end pt-[17px] space-x-3">
                         <Link href={contact.create().url} as="button">
                             <Button
-                                variant="outline" className="cursor-pointer"
+                                variant="outline"
+                                className="cursor-pointer"
                             >
                                 Create Single contact
                             </Button>
@@ -49,15 +101,8 @@ export default function Index() {
                     </div>
 
                 ) : (
-                    <div className="grid gap-2">
-                        {contacts.map((contact: Contact) => (
-                            <div key={contact.id} className="p-2 border rounded-md">
-                                <p><strong>Name:</strong> {contact.names}</p>
-                                <p><strong>Email:</strong> {contact.email}</p>
-                                <p><strong>Phone:</strong> {contact.phone}</p>
-                                <p><strong>Gender:</strong> {contact.gender}</p>
-                            </div>
-                        ))}
+                    <div className="py-2">
+                        <DataTable columns={columns} data={contacts} />
                     </div>
                 )}
             </div>

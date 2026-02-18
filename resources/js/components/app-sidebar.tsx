@@ -65,12 +65,12 @@ const mainNavItems: NavItem[] = [
         icon: BookUser,
         children: [
             {
-                title: 'Contact Groups',
+                title: 'Contacts',
                 href: contact.index(),
                 icon: Users,
             },
             {
-                title: 'Contacts',
+                title: 'Contact Groups',
                 href: '/surveys/ai',
                 icon: User,
             },
