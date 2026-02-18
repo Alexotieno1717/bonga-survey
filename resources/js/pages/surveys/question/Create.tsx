@@ -245,7 +245,7 @@ export default function Create() {
                                     <Popover>
                                         <PopoverTrigger asChild>
                                             <Button
-                                                variant={"outline"}
+                                                variant="outline"
                                                 className={cn(
                                                     "w-full pl-3 text-left font-normal",
                                                     !values.startDate && "text-muted-foreground"
@@ -275,7 +275,7 @@ export default function Create() {
                                     <Popover>
                                         <PopoverTrigger asChild>
                                             <Button
-                                                variant={"outline"}
+                                                variant="outline"
                                                 className={cn(
                                                     "w-full pl-3 text-left font-normal",
                                                     !values.endDate && "text-muted-foreground"
@@ -440,7 +440,7 @@ export default function Create() {
 
                                                     <Button
                                                         type="button"
-                                                        variant={'outline'}
+                                                        variant='outline'
                                                         onClick={() => {
                                                             const newOptions = [...question.options, ""];
                                                             setFieldValue(`questions[${index}].options`, newOptions);
@@ -641,7 +641,7 @@ export default function Create() {
                                 <p>{values.completionMessage?.length || 0} characters</p>
                                 <Button
                                     type="button"
-                                    variant={values.isCompletionMessageSaved ? "secondary" : "default"} // Blue when not saved, gray when saved
+                                    variant={(values.isCompletionMessageSaved ? "secondary" : "default") as | "default" | "secondary"} // Blue when not saved, gray when saved
                                     onClick={async () => {
                                         if (!values.completionMessage) {
                                             // Prevent saving if the input is empty
@@ -685,7 +685,7 @@ export default function Create() {
                                     <p className='flex justify-center items-center'>or</p>
                                     <Button
                                         type="button"
-                                        variant={"outline"}
+                                        variant="outline"
                                         className=" bg-transparent border border-[#E3E5EB] shadow-sm hover:shadow-md hover:bg-transparent focus:outline-none"
                                     >
                                         Upload file
@@ -754,7 +754,7 @@ export default function Create() {
                                         {/* Button to open the modal */}
                                         <Button
                                             type="button"
-                                            variant={"outline"}
+                                            variant="outline"
                                             onClick={() => setIsModalOpen(true)}
                                             className="flex justify-center items-center text-blue-500 space-x-2 bg-transparent border border-blue-500 shadow-sm hover:shadow-md hover:bg-transparent hover:text-blue-500 focus:outline-none"
                                         >
@@ -763,7 +763,7 @@ export default function Create() {
                                         </Button>
                                         <Button
                                             type="button"
-                                            variant={"outline"}
+                                            variant="outline"
                                             className="flex justify-center items-center text-gray-400 hover:text-gray-400 space-x-2 bg-transparent border border-[#E3E5EB] shadow-sm hover:shadow-md hover:bg-transparent focus:outline-none"
                                         >
                                             <Trash2 className='w-4 h-4' />
@@ -888,7 +888,7 @@ export default function Create() {
                                     <div className='flex space-x-4'>
                                         <Button
                                             type="button"
-                                            variant={"outline"}
+                                            variant="outline"
                                             className="flex justify-center items-center text-blue-500 space-x-2 bg-transparent border border-blue-500 shadow-sm hover:shadow-md hover:bg-transparent hover:text-blue-500 focus:outline-none"
                                         >
                                             <Download className='w-4 h-4' />
@@ -896,7 +896,7 @@ export default function Create() {
                                         </Button>
                                         <Button
                                             type="button"
-                                            variant={"outline"}
+                                            variant="outline"
                                             className="flex justify-center items-center text-gray-400 hover:text-gray-400 space-x-2 bg-transparent border border-[#E3E5EB] shadow-sm hover:shadow-md hover:bg-transparent focus:outline-none"
                                         >
                                             <Trash2 className='w-4 h-4' />
@@ -967,7 +967,7 @@ export default function Create() {
                                         <div className="flex space-x-2">
                                             <Button
                                                 type="button"
-                                                variant={"outline"}
+                                                variant="outline"
                                                 className="flex justify-center items-center text-red-400 hover:text-red-400 space-x-2 bg-transparent border border-red-400 shadow-sm hover:shadow-md hover:bg-transparent focus:outline-none"
                                             >
                                                 <Trash2 className='w-4 h-4' />
@@ -988,16 +988,16 @@ export default function Create() {
         }
     }
 
-    const handleSubmit = (values: FormValues) => {
+    const handleSubmit = (values: FormikValues) => {
         console.log(values);
     };
 
     function handleNextStep(
-        values: FormValues,
-        validateField: (field: string) => Promise<void> | Promise<string | undefined>,
+        values: FormikValues,
+        validateField: (field: string) => (Promise<void> | Promise<string | undefined>),
         // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-        setTouched: (touched: import("formik").FormikTouched<FormValues>, shouldValidate?: boolean | undefined) => Promise<void | import("formik").FormikErrors<FormValues>>,
-        errors: FormikErrors<FormValues>
+        setTouched: (touched: import("formik").FormikTouched<FormValues>, shouldValidate?: (boolean | undefined)) => Promise<void | import("formik").FormikErrors<FormValues>>,
+        errors: FormikErrors<FormikValues>
     ) {
         switch (currentStep) {
             case 0:
@@ -1077,7 +1077,7 @@ export default function Create() {
         }
     }
 
-    const isStep0Complete = (values: FormValues) => {
+    const isStep0Complete = (values: FormikValues) => {
         return (
             values.surveyName &&
             values.description &&
@@ -1087,7 +1087,7 @@ export default function Create() {
         );
     };
 
-    const isStep1Complete = (values: FormValues) => {
+    const isStep1Complete = (values: FormikValues) => {
         return values.questions.every(
             (question) =>
                 question.question &&
@@ -1096,7 +1096,7 @@ export default function Create() {
         );
     };
 
-    const isStep2Complete = (values: FormValues) => {
+    const isStep2Complete = (values: FormikValues) => {
         return values.completionMessage;
     };
 
@@ -1208,7 +1208,7 @@ export default function Create() {
                                 {RenderForm(touched, errors, values, setFieldValue)}
                                 <div className='py-6'>
                                     <Transition
-                                        as={"div"}
+                                        as="div"
                                         show={true}
                                         enter="transition-opacity duration-300"
                                         enterFrom="opacity-0"
@@ -1222,7 +1222,7 @@ export default function Create() {
                                                 <Button
                                                     type="button"
                                                     className='space-x-2'
-                                                    variant={'outline'}
+                                                    variant='outline'
                                                     onClick={() => {
                                                         if (currentStep === 3 && sendSurveyStep > 0) {
                                                             setSendSurveyStep(sendSurveyStep - 1);
@@ -1237,7 +1237,7 @@ export default function Create() {
                                             )}
                                             <Button
                                                 type="button"
-                                                variant={"default"}
+                                                variant="default"
                                                 className="px-6 py-3 text-base font-semibold border border-transparent rounded-lg shadow-sm focus:outline-none w-auto space-x-2"
                                                 onClick={() => handleNextStep(values, validateField, setTouched, errors)}
                                             >

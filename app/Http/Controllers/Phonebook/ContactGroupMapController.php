@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Phonebook;
 
 use App\Http\Controllers\Controller;
@@ -22,7 +24,7 @@ class ContactGroupMapController extends Controller
     /**
      * Show the form for creating a new resource.
      */
-    public function create()
+    public function create(): void
     {
         //
     }
@@ -30,7 +32,7 @@ class ContactGroupMapController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(Request $request): void
     {
         //
     }
@@ -38,7 +40,7 @@ class ContactGroupMapController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(ContactGroupMap $contactGroupMap)
+    public function show(ContactGroupMap $contactGroupMap): void
     {
         //
     }
@@ -46,7 +48,7 @@ class ContactGroupMapController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(ContactGroupMap $contactGroupMap)
+    public function edit(ContactGroupMap $contactGroupMap): void
     {
         //
     }
@@ -54,7 +56,7 @@ class ContactGroupMapController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, ContactGroupMap $contactGroupMap)
+    public function update(Request $request, ContactGroupMap $contactGroupMap): void
     {
         //
     }
@@ -62,7 +64,7 @@ class ContactGroupMapController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(ContactGroupMap $contactGroupMap)
+    public function destroy(ContactGroupMap $contactGroupMap): void
     {
         //
     }

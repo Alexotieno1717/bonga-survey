@@ -1,0 +1,66 @@
+{
+    "surveyName": "Testing",
+    "description": "helloo  worlld ",
+    "startDate": "2026-02-04T00:00:00+03:00",
+    "endDate": "2026-02-27T00:00:00+03:00",
+    "triggerWord": "start",
+    "completionMessage": "Thank you for taking time to complete our survey, Your feedback matters alot to us",
+    "invitationMessage": "Reply with start to begin",
+    "isCompletionMessageSaved": true,
+    "isSavingCompletionMessage": false,
+    "scheduleTime": "2026-02-19T15:32",
+    "questions": [
+        {
+            "allowMultiple": false,
+            "branching": "1",
+            "freeTextDescription": "",
+            "isEditing": false,
+            "isSaved": true,
+            "isSaving": false,
+            "options": [],
+            "question": "rate us from 1-10",
+            "responseType": "free-text"
+        },
+        {
+            "allowMultiple": true,
+            "branching": [null, "3"],
+            "freeTextDescription": "",
+            "isEditing": false,
+            "isSaved": true,
+            "isSaving": false,
+            "options": ["delivery", "the rider"],
+            "question": "What did you not like about the delivery",
+            "responseType": "multiple-choice"
+        },
+        {
+            "allowMultiple": false,
+            "branching": "-1",
+            "freeTextDescription": "",
+            "isEditing": false,
+            "isSaved": true,
+            "isSaving": false,
+            "options": [],
+            "question": "what did you not like about the delivery",
+            "responseType": "free-text"
+        },
+        {
+            "allowMultiple": false,
+            "branching": "-1",
+            "freeTextDescription": "",
+            "isEditing": false,
+            "isSaved": true,
+            "isSaving": false,
+            "options": [],
+            "question": "what did you not like about the rider ",
+            "responseType": "free-text"
+        }
+    ],
+    "recipients": [
+        {
+            "name": "Alex Otieno",
+            "phone": "0748815593",
+            "email": "alex.otieno@olivetreemobile.co",
+            "id": "1"
+        }
+    ]
+}

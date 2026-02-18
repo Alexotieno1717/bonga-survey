@@ -27,7 +27,7 @@ import {
     DropdownMenuContent,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ArrowDown, ChevronDown, Download } from 'lucide-react';
+import { ChevronDown, Download } from 'lucide-react';
 
 
 interface DataTableProps<TData, TValue> {

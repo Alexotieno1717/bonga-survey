@@ -7,6 +7,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -53,14 +54,13 @@ class User extends Authenticatable
         ];
     }
 
-    public function contacts(): User|\Illuminate\Database\Eloquent\Relations\HasMany
+    public function contacts(): User|HasMany
     {
         return $this->hasMany(Contact::class);
     }
 
-    public function contactGroups(): User|\Illuminate\Database\Eloquent\Relations\HasMany
+    public function contactGroups(): User|HasMany
     {
         return $this->hasMany(ContactGroup::class);
     }
-
 }

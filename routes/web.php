@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Phonebook\ContactController;
 use App\Http\Controllers\Phonebook\ContactGroupController;
+use App\Http\Controllers\Phonebook\ContactGroupMapController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -20,6 +21,6 @@ Route::get('phonebook/contact/create', [contactController::class, 'create'])->na
 
 Route::get('phonebook/contactgroup', [contactgroupController::class, 'index'])->name('contactgroup.index')->middleware(['auth']);
 
-Route::get('phonebook/contactgroupmaps', [\App\Http\Controllers\Phonebook\ContactGroupMapController::class, 'index'])->name('contactgroupmaps.index')->middleware(['auth']);
+Route::get('phonebook/contactgroupmaps', [ContactGroupMapController::class, 'index'])->name('contactgroupmaps.index')->middleware(['auth']);
 
 require __DIR__.'/settings.php';
