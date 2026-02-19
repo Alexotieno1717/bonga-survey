@@ -14,10 +14,12 @@ return new class extends Migration
         Schema::create('questions', function (Blueprint $table) {
             $table->id();
             $table->foreignId('survey_id')->constrained()->onDelete('cascade');
-            $table->text('question');
+            $table->string('question');
             $table->enum('response_type', ['free-text', 'multiple-choice']);
+            $table->text('free_text_description')->nullable();
             $table->boolean('allow_multiple')->default(false);
-            $table->text('branching')->nullable(); // store next question id(s) as JSON
+            $table->integer('order')->default(0);
+            $table->json('branching')->nullable(); // Store branching rules
             $table->timestamps();
         });
     }

@@ -14,12 +14,16 @@ return new class extends Migration
         Schema::create('surveys', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->text('description')->nullable();
-            $table->text('invitation_message')->nullable();
-            $table->text('completion_message')->nullable();
+            $table->text('description');
+            $table->date('start_date');
+            $table->date('end_date');
             $table->string('trigger_word');
-            $table->dateTime('start_date');
-            $table->dateTime('end_date');
+            $table->text('completion_message')->nullable();
+            $table->text('invitation_message')->nullable();
+            $table->timestamp('scheduled_time')->nullable();
+            $table->enum('status', ['draft', 'active', 'completed', 'cancelled'])->default('draft');
+            $table->json('branching_logic')->nullable(); // Store branching rules
+            $table->foreignId('created_by')->constrained('users');
             $table->timestamps();
         });
     }

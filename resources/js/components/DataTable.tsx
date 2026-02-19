@@ -1,15 +1,26 @@
 "use client"
 
-import {
+import type {
     ColumnDef,
+    ColumnFiltersState,
+    VisibilityState} from "@tanstack/react-table";
+import {
     flexRender,
     getCoreRowModel, getPaginationRowModel,
     useReactTable,
-    ColumnFiltersState,
-    getFilteredRowModel,
-    VisibilityState,
+    getFilteredRowModel
 } from "@tanstack/react-table"
 
+import { ChevronDown, Download } from 'lucide-react';
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
 import {
     Table,
     TableBody,
@@ -18,25 +29,15 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table"
-import { Button } from '@/components/ui/button';
-import { Input } from "@/components/ui/input"
-import React from 'react';
-import {
-    DropdownMenu,
-    DropdownMenuCheckboxItem,
-    DropdownMenuContent,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { ChevronDown, Download } from 'lucide-react';
 
 
-interface DataTableProps<TData, TValue> {
-    columns: ColumnDef<TData, TValue>[]
+interface DataTableProps<TData> {
+    columns: ColumnDef<TData>[]
     data: TData[]
     filterColumn?: keyof TData | null
 }
 
-export function DataTable<TData, TValue>({ columns, data, filterColumn }: DataTableProps<TData, TValue>) {
+export function DataTable<TData>({ columns, data, filterColumn }: DataTableProps<TData>) {
 
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})

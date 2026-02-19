@@ -21,6 +21,10 @@ class Contact extends Model
         'gender',
     ];
 
+    protected $casts = [
+        'gender' => 'string'
+    ];
+
     public function groups(): BelongsToMany
     {
         return $this->belongsToMany(ContactGroup::class, 'contact_groups_maps', 'contact_id', 'group_id');
@@ -39,7 +43,7 @@ class Contact extends Model
     public function surveys(): BelongsToMany
     {
         return $this->belongsToMany(Survey::class, 'contact_survey')
-            ->withPivot('sent_at')
+            ->withPivot(['sent_at'])
             ->withTimestamps();
     }
 }

@@ -1,12 +1,12 @@
-import AppLayout from '@/layouts/app-layout';
 import { Head, usePage } from '@inertiajs/react';
-import NotFound from '@/components/NotFound';
-import contact from '@/routes/contact';
+import type { ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '@/components/DataTable';
-import type { BreadcrumbItem } from '@/types';
-import contactgroupmaps from '@/routes/contactgroupmaps';
-import { ColumnDef } from '@tanstack/react-table';
+import NotFound from '@/components/NotFound';
 import { Checkbox } from '@/components/ui/checkbox';
+import AppLayout from '@/layouts/app-layout';
+import contact from '@/routes/contact';
+import contactgroupmaps from '@/routes/contactgroupmaps';
+import type { BreadcrumbItem } from '@/types';
 
 interface ContactGroupMapProps {
     group: string;
@@ -22,7 +22,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 export default function Index() {
 
-    const { contactgroupmaps } = usePage().props as { contactgroupmaps: ContactGroupMapProps[] };
+    const { contactgroupmaps } = usePage().props as unknown as {
+        contactgroupmaps: ContactGroupMapProps[];
+    };
 
     const columns: ColumnDef<ContactGroupMapProps>[] = [
         {
@@ -85,7 +87,7 @@ export default function Index() {
                         </div>
 
                         <div className="py-2">
-                            <DataTable<ContactGroupMapProps, any> columns={columns} data={contactgroupmaps} filterColumn="group" />
+                            <DataTable<ContactGroupMapProps> columns={columns} data={contactgroupmaps} filterColumn="group" />
                         </div>
                     </>
 

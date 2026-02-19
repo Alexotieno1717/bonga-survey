@@ -14,7 +14,9 @@ return new class extends Migration
         Schema::create('options', function (Blueprint $table) {
             $table->id();
             $table->foreignId('question_id')->constrained()->onDelete('cascade');
-            $table->string('option_text');
+            $table->string('option');
+            $table->integer('order')->default(0);
+            $table->json('branching')->nullable(); // Where this option leads to
             $table->timestamps();
         });
     }

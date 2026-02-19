@@ -137,11 +137,11 @@ export default function Create() {
         questionIndex: null,
     });
 
-    const handleFormStep = (step: number) => {
-        if (step < 4) {
-            setCurrentStep(step);
-        }
-    }
+    // const handleFormStep = (step: number) => {
+    //     if (step < 4) {
+    //         setCurrentStep(step);
+    //     }
+    // }
 
     // fetch contact from the JSON file
     useEffect(() => {
@@ -766,7 +766,7 @@ export default function Create() {
                                             variant="outline"
                                             className="flex justify-center items-center text-gray-400 hover:text-gray-400 space-x-2 bg-transparent border border-[#E3E5EB] shadow-sm hover:shadow-md hover:bg-transparent focus:outline-none"
                                         >
-                                            <Trash2 className='w-4 h-4' />
+                                            <Trashany2 className='w-4 h-4' />
                                             <span>Delete</span>
                                         </Button>
                                         <Field
@@ -1100,13 +1100,13 @@ export default function Create() {
         return values.completionMessage;
     };
 
-    const isStep3Complete = (values: FormValues) => {
-        return values.recipients.length > 0;
-    };
-
-    const isStep4Complete = (values: FormValues) => {
-        return values.invitationMessage && values.scheduleTime;
-    };
+    // const isStep3Complete = (values: FormValues) => {
+    //     return values.recipients.length > 0;
+    // };
+    //
+    // const isStep4Complete = (values: FormValues) => {
+    //     return values.invitationMessage && values.scheduleTime;
+    // };
 
 
     return (
