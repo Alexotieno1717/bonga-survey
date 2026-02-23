@@ -1,10 +1,13 @@
 import { Transition } from '@headlessui/react';
-import { Head } from '@inertiajs/react';
+import type { PageProps as InertiaPageProps } from '@inertiajs/core';
+import { Head, router, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
 import type {
     FormikErrors,
+    FormikHelpers,
     FormikTouched,
-    FormikValues} from 'formik';
+    FormikValues,
+} from 'formik';
 import {
     ErrorMessage,
     Field,
@@ -21,7 +24,7 @@ import {
     TriangleAlert,
     UserPlus,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import * as Yup from 'yup';
 import AddContactsModal from '@/components/AddContactsModal';
@@ -42,13 +45,24 @@ interface Question {
     isSaved?: boolean;
     isSaving?: boolean;
     isEditing?: boolean;
+    branching?: string | number | (string | number)[] | null; // Accept various types
 }
 
-interface Recipient {
+interface Contact {
     id: string;
-    name: string;
+    names: string;
     phone: string;
     email: string;
+    gender?: 'male' | 'female';
+    contact_group_id?: number;
+}
+
+interface PageProps extends InertiaPageProps {
+    contacts: Contact[];
+    contactGroups?: Array<{
+        id: number;
+        name: string;
+    }>;
 }
 
 const steps = [
@@ -67,7 +81,9 @@ interface FormValues {
     triggerWord: string;
     questions: Question[];
     completionMessage?: string;
-    recipients: Recipient[];
+    recipients: Contact[]; // This should always be an array
+    recipientSelectionType: 'all' | 'select'; // Add this to track radio selection
+    selectedContactIds: number[]; // Add this to track selected contacts
     invitationMessage: string;
     scheduleTime: string;
 }
@@ -78,15 +94,20 @@ const initialValues: FormValues = {
     startDate: '',
     endDate: '',
     triggerWord: '',
-    questions: [{
-        question: '',
-        responseType: "free-text",
-        options: [],
-        allowMultiple: false,
-        freeTextDescription: '',
-    }],
+    questions: [
+        {
+            question: '',
+            responseType: 'free-text',
+            options: [],
+            allowMultiple: false,
+            freeTextDescription: '',
+            branching: undefined,
+        },
+    ],
     completionMessage: '',
-    recipients: [],
+    recipients: [], // Initialize as empty array
+    recipientSelectionType: 'select', // Default to 'select'
+    selectedContactIds: [], // Initialize empty selected contacts
     invitationMessage: '',
     scheduleTime: '',
 };
@@ -125,36 +146,23 @@ export default function Create() {
     const [sendSurveyStep, setSendSurveyStep] = useState<
         0 | 1 | 2 | 3 | number
     >(0); // 0: Add Recipients, 1: Review Recipients, 2: Invitation, 3: Send
-    const [contacts, setContacts] = useState<Recipient[]>([]);
     const [isDisabled, setDisabled] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const [deleteConfirmation, setDeleteConfirmation] = useState<{
         isOpen: boolean;
         questionIndex: number | null;
-    }>({
-        isOpen: false,
-        questionIndex: null,
-    });
+    }>({ isOpen: false, questionIndex: null, });
+
+    const { contacts } = usePage<PageProps>().props;
+
+    console.log(contacts)
 
     // const handleFormStep = (step: number) => {
     //     if (step < 4) {
     //         setCurrentStep(step);
     //     }
     // }
-
-    // fetch contact from the JSON file
-    useEffect(() => {
-        fetch('/contacts.json')
-            .then((response) => response.json())
-            .then((data) =>{
-                setContacts(data.contacts); // Set the contacts state
-                console.log(data.contacts); // Set the contacts state
-            })
-            .catch((error) => {
-                console.error('Error fetching contacts:', error);
-            })
-    }, [])
 
     const handleDeleteQuestion = (
         values: FormikValues,
@@ -240,7 +248,7 @@ export default function Create() {
                             </div>
 
                             <div className="flex space-x-6 w-full">
-                                <div className="flex-1 space-y-[6px] mb-3">
+                                <div className="flex-1 space-y-1.5 mb-3">
                                     <label className="block text-sm text-[#25262d] font-medium">Start Date</label>
                                     <Popover>
                                         <PopoverTrigger asChild>
@@ -270,7 +278,7 @@ export default function Create() {
                                     ) : null}
                                 </div>
 
-                                <div className="flex-1 space-y-[6px] mb-3">
+                                <div className="flex-1 space-y-1.5 mb-3">
                                     <label className="block text-sm text-[#25262d] font-medium">End Date</label>
                                     <Popover>
                                         <PopoverTrigger asChild>
@@ -305,7 +313,7 @@ export default function Create() {
                                 </div>
                             </div>
 
-                            <div className="space-y-[6px] mb-3">
+                            <div className="space-y-1.5 mb-3">
                                 <label className="block text-sm text-[#25262d] font-medium">Trigger Word</label>
                                 <Field
                                     type="text"
@@ -337,7 +345,7 @@ export default function Create() {
                                     {/* Card container for each question */}
                                     <div className="bg-white shadow-lg p-6 rounded-lg">
                                         <div className="flex space-x-6 w-full">
-                                            <div className='flex-1 space-y-[6px]'>
+                                            <div className='flex-1 space-y-1.5'>
                                                 <label className="block text-sm font-medium">
                                                     Question {index + 1} {/* Add the question number dynamically */}
                                                 </label>
@@ -359,7 +367,7 @@ export default function Create() {
                                                 {/*) : null}*/}
                                             </div>
 
-                                            <div className='space-y-[6px]'>
+                                            <div className='space-y-1.5'>
                                                 <label className="block text-sm font-medium">Response Type</label>
                                                 <Field
                                                     name={`questions[${index}].responseType`}
@@ -467,7 +475,7 @@ export default function Create() {
 
                                         {/* Conditionally render the Explanation (Optional) input (only for free-text) */}
                                         {question.responseType === "free-text" && (
-                                            <div className='flex-1 space-y-[6px] mt-4'>
+                                            <div className='flex-1 space-y-1.5 mt-4'>
                                                 <label className="block text-sm font-medium">Explanation (Optional)</label>
                                                 <Field
                                                     name={`questions[${index}].freeTextDescription`}
@@ -585,6 +593,7 @@ export default function Create() {
                                                 isSaved: false,
                                                 isSaving: false,
                                                 isEditing: false,
+                                                branching: null
                                             };
                                             setFieldValue("questions", [...values.questions, newQuestion]);
                                         }}
@@ -669,6 +678,7 @@ export default function Create() {
 
             case 3: // Send Survey
                 switch (sendSurveyStep) {
+
                     case 0: // Add Recipients
                         return (
                             <div>
@@ -686,36 +696,122 @@ export default function Create() {
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        className=" bg-transparent border border-[#E3E5EB] shadow-sm hover:shadow-md hover:bg-transparent focus:outline-none"
+                                        className="bg-transparent border border-[#E3E5EB] shadow-sm hover:shadow-md hover:bg-transparent focus:outline-none"
                                     >
                                         Upload file
                                     </Button>
                                 </div>
 
                                 <div className="mb-6">
-                                    <label className="block text-lg  text-[#25262d] font-medium">Select Survey
-                                        Participants from your contacts list</label>
+                                    <label className="block text-lg text-[#25262d] font-medium">
+                                        Select Survey Participants from your contacts list
+                                    </label>
                                     <div className="flex flex-col">
                                         <label className="inline-flex items-center">
                                             <Field
                                                 type="radio"
-                                                name="recipients"
+                                                name="recipientSelectionType"
                                                 value="all"
                                                 className="form-radio"
+                                                onChange={() => {
+                                                    // When "All contacts" is selected, set recipients to all contacts
+                                                    setFieldValue('recipientSelectionType', 'all');
+                                                    setFieldValue('recipients', contacts);
+                                                    setFieldValue('selectedContactIds', contacts.map(c => Number(c.id)));
+                                                }}
                                             />
-                                            <span className="ml-2">All contacts ( {contacts.length || 0} ) </span>
+                                            <span className="ml-2">All contacts ( {contacts.length || 0} )</span>
                                         </label>
                                         <label className="inline-flex items-center">
                                             <Field
                                                 type="radio"
-                                                name="recipients"
+                                                name="recipientSelectionType"
                                                 value="select"
                                                 className="form-radio"
+                                                onChange={() => {
+                                                    // When "Select" is chosen, clear recipients
+                                                    setFieldValue('recipientSelectionType', 'select');
+                                                    setFieldValue('recipients', []);
+                                                    setFieldValue('selectedContactIds', []);
+                                                }}
                                             />
                                             <span className="ml-2">Select Survey Participants</span>
                                         </label>
                                     </div>
                                 </div>
+
+                                {/* Show contact selection table when "select" is chosen */}
+                                {values.recipientSelectionType === 'select' && (
+                                    <div className="mt-4">
+                                        <h3 className="text-md font-medium mb-2">Select Contacts</h3>
+                                        <div className="border rounded-lg overflow-hidden">
+                                            <table className="w-full">
+                                                <thead className="bg-gray-50">
+                                                <tr>
+                                                    <th className="px-4 py-2 text-left">
+                                                        <input
+                                                            type="checkbox"
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    // Select all contacts
+                                                                    setFieldValue('recipients', contacts);
+                                                                    setFieldValue('selectedContactIds', contacts.map(c => Number(c.id)));
+                                                                } else {
+                                                                    // Deselect all
+                                                                    setFieldValue('recipients', []);
+                                                                    setFieldValue('selectedContactIds', []);
+                                                                }
+                                                            }}
+                                                            checked={values.recipients.length === contacts.length && contacts.length > 0}
+                                                        />
+                                                    </th>
+                                                    <th className="px-4 py-2 text-left">Name</th>
+                                                    <th className="px-4 py-2 text-left">Phone</th>
+                                                    <th className="px-4 py-2 text-left">Email</th>
+                                                </tr>
+                                                </thead>
+                                                <tbody>
+                                                {contacts.map((contact) => (
+                                                    <tr key={contact.id} className="border-t">
+                                                        <td className="px-4 py-2">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={values.recipients.some(r => r.id === contact.id)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        // Add contact to recipients
+                                                                        setFieldValue('recipients', [...values.recipients, contact]);
+                                                                        setFieldValue('selectedContactIds', [
+                                                                            ...values.selectedContactIds,
+                                                                            Number(contact.id)
+                                                                        ]);
+                                                                    } else {
+                                                                        // Remove contact from recipients
+                                                                        setFieldValue(
+                                                                            'recipients',
+                                                                            values.recipients.filter(r => r.id !== contact.id)
+                                                                        );
+                                                                        setFieldValue(
+                                                                            'selectedContactIds',
+                                                                            values.selectedContactIds.filter(id => id !== Number(contact.id))
+                                                                        );
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-2">{contact.names}</td>
+                                                        <td className="px-4 py-2">{contact.phone}</td>
+                                                        <td className="px-4 py-2">{contact.email}</td>
+                                                    </tr>
+                                                ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <p className="text-sm text-gray-500 mt-2">
+                                            Selected: {values.recipients.length} contacts
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         );
 
@@ -725,33 +821,35 @@ export default function Create() {
                                 <div className='flex flex-col lg:flex-row lg:justify-between lg:items-center mb-6 space-y-4 lg:space-y-0'>
                                     <div className='space-y-3'>
                                         <h1 className="font-bold text-lg pb-4">Review Recipients</h1>
-                                        <p className='text-gray-500 text-sm font-normal'>Kindly review the recipients and rectify the ones that need fixing.</p>
+                                        <p className='text-gray-500 text-sm font-normal'>
+                                            Kindly review the recipients and rectify the ones that need fixing.
+                                        </p>
                                     </div>
 
                                     <div className='flex space-x-4'>
-
-                                        {/* Render the AddContactsModal */}
                                         <AddContactsModal
                                             isOpen={isModalOpen}
                                             onClose={() => setIsModalOpen(false)}
                                             onAddRecipient={(newRecipient) => {
-                                                const recipientWithId = {
-                                                    ...newRecipient,
-                                                    id: String(contacts.length + 1), // Generate a unique ID
+                                                const newContact: Contact = {
+                                                    id: String(Date.now()),
+                                                    names: newRecipient.names,
+                                                    phone: newRecipient.phone,
+                                                    email: newRecipient.email || '',
+                                                    // gender: newRecipient.gender,
+                                                    // contact_group_id: newRecipient.contact_group_id
                                                 };
 
-                                                // Update the contacts state
-                                                setContacts([...contacts, recipientWithId]);
-
                                                 // Update the Formik recipients field
-                                                setFieldValue('recipients', [...values.recipients, recipientWithId]);
+                                                setFieldValue('recipients', [...values.recipients, newContact]);
 
                                                 // Close the modal
                                                 setIsModalOpen(false);
+
+                                                toast.success('Recipient added successfully!');
                                             }}
                                         />
 
-                                        {/* Button to open the modal */}
                                         <Button
                                             type="button"
                                             variant="outline"
@@ -761,14 +859,16 @@ export default function Create() {
                                             <UserPlus className='w-4 h-4' />
                                             <span>Add New Recipient</span>
                                         </Button>
+
                                         <Button
                                             type="button"
                                             variant="outline"
                                             className="flex justify-center items-center text-gray-400 hover:text-gray-400 space-x-2 bg-transparent border border-[#E3E5EB] shadow-sm hover:shadow-md hover:bg-transparent focus:outline-none"
                                         >
-                                            <Trashany2 className='w-4 h-4' />
+                                            <Trash2 className='w-4 h-4' />
                                             <span>Delete</span>
                                         </Button>
+
                                         <Field
                                             name='search'
                                             type="text"
@@ -791,18 +891,27 @@ export default function Create() {
                                     </tr>
                                     </thead>
                                     <tbody>
-                                    {contacts.map((contact: Recipient) => (
+                                    {values.recipients.map((contact: Contact) => (
                                         <tr key={contact.id} className="border-t border-[#E3E5EB] bg-gray-50">
                                             <td className="px-4 py-3">
                                                 <input type="checkbox" className="w-4 h-4" />
                                             </td>
                                             <td className="px-4 py-3 text-blue-500">{contact.phone}</td>
-                                            <td className="px-4 py-3">{contact.name}</td>
+                                            <td className="px-4 py-3">{contact.names}</td>
                                             <td className="px-4 py-3 flex space-x-2">
                                                 <button className="p-2 rounded-md border border-gray-300 hover:bg-gray-200">
                                                     <EditIcon className='w-4 h-4' />
                                                 </button>
-                                                <button className="p-2 rounded-md border border-gray-300 hover:bg-gray-200">
+                                                <button
+                                                    className="p-2 rounded-md border border-gray-300 hover:bg-gray-200"
+                                                    onClick={() => {
+                                                        // Remove recipient from the list
+                                                        setFieldValue(
+                                                            'recipients',
+                                                            values.recipients.filter((r: Contact) => r.id !== contact.id)
+                                                        );
+                                                    }}
+                                                >
                                                     <Trash2 className='w-4 h-4' />
                                                 </button>
                                             </td>
@@ -810,6 +919,12 @@ export default function Create() {
                                     ))}
                                     </tbody>
                                 </table>
+
+                                {values.recipients.length === 0 && (
+                                    <div className="text-center py-8 text-gray-500">
+                                        No recipients selected. Please go back and select recipients.
+                                    </div>
+                                )}
 
                                 <div className="flex justify-between items-center mt-4">
                                     <div className="flex items-center space-x-2">
@@ -988,22 +1103,111 @@ export default function Create() {
         }
     }
 
-    const handleSubmit = (values: FormikValues) => {
-        console.log(values);
+    // In your handleSubmit function, update the questions mapping:
+    const handleSubmit = async (
+        values: FormValues,
+        { setSubmitting }: FormikHelpers<FormValues>,
+    ) => {
+        console.log(values)
+        try {
+            // Transform the data to match the backend expectations
+            const surveyData = {
+                surveyName: values.surveyName,
+                description: values.description,
+                startDate: values.startDate,
+                endDate: values.endDate,
+                triggerWord: values.triggerWord,
+                completionMessage: values.completionMessage,
+                invitationMessage: values.invitationMessage,
+                scheduleTime: values.scheduleTime,
+                questions: values.questions.map((q) => {
+                    // Ensure branching is always an array or null
+                    let branching = q.branching;
+
+                    // If branching is not an array, convert it or set to null
+                    if (branching && !Array.isArray(branching)) {
+                        // If it's a single value, wrap it in an array
+                        branching = [branching];
+                    } else if (!branching) {
+                        branching = null;
+                    }
+
+                    return {
+                        question: q.question,
+                        responseType: q.responseType,
+                        options: q.options || [],
+                        allowMultiple: q.allowMultiple || false,
+                        freeTextDescription: q.freeTextDescription,
+                        branching: branching, // This will be an array or null
+                    };
+                }),
+                recipients: values.recipients.map((r) => ({
+                    id: r.id,
+                    names: r.names,
+                    phone: r.phone,
+                    email: r.email,
+                    gender: r.gender,
+                    contact_group_id: r.contact_group_id,
+                })),
+            };
+            console.log(values)
+
+            // Submit using Inertia
+            router.post('/surveys/question', surveyData, {
+                onSuccess: () => {
+                    toast.success('Survey created successfully!', {
+                        position: 'top-center',
+                        richColors: true,
+                    });
+                    console.log(values)
+                    router.visit('/surveys/question');
+                },
+                onError: (errors) => {
+                    console.log(values);
+                    console.error('Validation errors:', errors);
+                    toast.error(
+                        'Failed to create survey. Please check your inputs.',
+                        {
+                            position: 'top-center',
+                            richColors: true,
+                        },
+                    );
+                },
+                onFinish: () => {
+                    setSubmitting(false);
+                },
+            });
+        } catch (error) {
+            console.error('Error submitting survey:', error);
+            toast.error('An unexpected error occurred.', {
+                position: "top-center",
+                richColors: true
+            });
+            setSubmitting(false);
+        }
     };
 
     function handleNextStep(
         values: FormikValues,
-        validateField: (field: string) => (Promise<void> | Promise<string | undefined>),
-        // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-        setTouched: (touched: import("formik").FormikTouched<FormValues>, shouldValidate?: (boolean | undefined)) => Promise<void | import("formik").FormikErrors<FormValues>>,
-        errors: FormikErrors<FormikValues>
+        validateField: (
+            field: string,
+        ) => Promise<void> | Promise<string | undefined>,
+        setTouched: (
+            touched: FormikTouched<FormValues>,
+            shouldValidate?: boolean,
+        ) => Promise<void | FormikErrors<FormValues>>,
+        errors: FormikErrors<FormValues>,
+        submitForm: () => Promise<void>,
     ) {
         switch (currentStep) {
             case 0:
                 if (
                     currentStep === 0 &&
-                    (!values.surveyName || !values.description || !values.startDate || !values.endDate || !values.triggerWord)
+                    (!values.surveyName ||
+                        !values.description ||
+                        !values.startDate ||
+                        !values.endDate ||
+                        !values.triggerWord)
                 ) {
                     validateField('surveyName');
                     validateField('description');
@@ -1018,7 +1222,7 @@ export default function Create() {
                             endDate: true,
                             triggerWord: true,
                         },
-                        true
+                        true,
                     );
                 } else if (
                     currentStep === 0 &&
@@ -1035,9 +1239,18 @@ export default function Create() {
             case 1:
                 if (
                     currentStep === 1 &&
-                    values.questions.some(question => !question.question || !question.responseType || !question.isSaved)
+                    values.questions.some(
+                        (question: {
+                            question: string;
+                            responseType: 'free-text' | 'multiple-choice';
+                            isSaved: boolean;
+                        }) =>
+                            !question.question ||
+                            !question.responseType ||
+                            !question.isSaved,
+                    )
                 ) {
-                    values.questions.forEach((_, index) => {
+                    values.questions.forEach((_: Question, index: number) => {
                         validateField(`questions[${index}].question`);
                         validateField(`questions[${index}].responseType`);
                     });
@@ -1045,20 +1258,23 @@ export default function Create() {
                         questions: values.questions.map(() => ({
                             question: true,
                             responseType: true,
-                        }))
+                        })),
                     });
-                } else if (
-                    currentStep === 1 &&
-                    !errors.questions
-                ) {
+                } else if (currentStep === 1 && !errors.questions) {
                     setCurrentStep(currentStep + 1);
                 }
                 break;
 
             case 2:
-                if (values.completionMessage && !values.isCompletionMessageSaved) {
+                if (
+                    values.completionMessage &&
+                    !values.isCompletionMessageSaved
+                ) {
                     // Prevent moving to the next step if the completion message is not saved
-                    toast.error("Please save the completion message before proceeding.", { position: "top-center", richColors: true });
+                    toast.error(
+                        'Please save the completion message before proceeding.',
+                        { position: 'top-center', richColors: true },
+                    );
                     return;
                 }
                 setCurrentStep(currentStep + 1);
@@ -1066,9 +1282,39 @@ export default function Create() {
 
             case 3:
                 if (sendSurveyStep < 3) {
+                    // Validate that recipients are selected before moving to next step
+                    if (sendSurveyStep === 0 && values.recipients.length === 0) {
+                        toast.error('Please select at least one recipient.', {
+                            position: 'top-center',
+                            richColors: true,
+                        });
+                        return;
+                    }
                     setSendSurveyStep(sendSurveyStep + 1);
                 } else {
-                    handleSubmit(values);
+                    // Validate all required fields before final submission
+                    if (values.recipients.length === 0) {
+                        toast.error('Please select at least one recipient.', {
+                            position: 'top-center',
+                            richColors: true,
+                        });
+                        return;
+                    }
+                    if (!values.invitationMessage) {
+                        toast.error('Please enter an invitation message.', {
+                            position: 'top-center',
+                            richColors: true,
+                        });
+                        return;
+                    }
+                    if (!values.scheduleTime) {
+                        toast.error('Please select a schedule time.', {
+                            position: 'top-center',
+                            richColors: true,
+                        });
+                        return;
+                    }
+                    submitForm();
                 }
                 break;
 
@@ -1089,7 +1335,7 @@ export default function Create() {
 
     const isStep1Complete = (values: FormikValues) => {
         return values.questions.every(
-            (question) =>
+            (question: Question) =>
                 question.question &&
                 question.responseType &&
                 (question.responseType === "free-text" || question.options.length > 0)
@@ -1100,41 +1346,41 @@ export default function Create() {
         return values.completionMessage;
     };
 
-    // const isStep3Complete = (values: FormValues) => {
-    //     return values.recipients.length > 0;
-    // };
-    //
-    // const isStep4Complete = (values: FormValues) => {
-    //     return values.invitationMessage && values.scheduleTime;
-    // };
+    const isStep3Complete = (values: FormValues) => {
+        return values.recipients.length > 0;
+    };
+
+    const isStep4Complete = (values: FormValues) => {
+        return values.invitationMessage && values.scheduleTime;
+    };
 
 
     return (
         <AppLayout>
             <Head title="Create Surveys Questions" />
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
-
                 <Formik
                     initialValues={initialValues}
                     onSubmit={handleSubmit}
                     validationSchema={validationSchema}
                 >
                     {({
-                          values,
-                          validateField,
-                          touched,
-                          setTouched,
-                          errors,
-                          setFieldValue,
-                      }) => (
+                        values,
+                        validateField,
+                        touched,
+                        setTouched,
+                        errors,
+                        setFieldValue,
+                        submitForm,
+                        isSubmitting,
+                    }) => (
                         <>
-                            <div className="inline-flex h-9 items-center rounded-lg bg-muted  text-muted-foreground">
+                            <div className="inline-flex h-9 items-center rounded-lg bg-muted text-muted-foreground">
                                 <div
-                                    className={`
-                                inline-flex items-center justify-center whitespace-nowrap px-3 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow border                          ${
+                                    className={`inline-flex items-center justify-center border px-3 py-2 text-sm font-medium whitespace-nowrap ring-offset-background transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow ${
                                         currentStep === 0
-                                            ? "bg-blue-500 text-white"
-                                            : "bg-white text-gray-500"
+                                            ? 'bg-blue-500 text-white'
+                                            : 'bg-white text-gray-500'
                                     }`}
                                     onClick={() => setCurrentStep(0)}
                                 >
@@ -1142,13 +1388,12 @@ export default function Create() {
                                 </div>
 
                                 <div
-                                    className={`inline-flex items-center justify-center whitespace-nowrap px-3 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow border
-                                    ${
+                                    className={`inline-flex items-center justify-center border px-3 py-2 text-sm font-medium whitespace-nowrap ring-offset-background transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow ${
                                         currentStep === 1
-                                            ? "bg-blue-500 text-white"
+                                            ? 'bg-blue-500 text-white'
                                             : isStep0Complete(values)
-                                                ? "bg-white text-gray-500 cursor-pointer"
-                                                : "text-gray-400 cursor-not-allowed"
+                                              ? 'cursor-pointer bg-white text-gray-500'
+                                              : 'cursor-not-allowed text-gray-400'
                                     }`}
                                     onClick={() => {
                                         if (isStep0Complete(values)) {
@@ -1160,13 +1405,12 @@ export default function Create() {
                                 </div>
 
                                 <div
-                                    className={`inline-flex items-center justify-center whitespace-nowrap px-3 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow border
-                                    ${
+                                    className={`inline-flex items-center justify-center border px-3 py-2 text-sm font-medium whitespace-nowrap ring-offset-background transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow ${
                                         currentStep === 2
-                                            ? "bg-blue-500 text-white"
+                                            ? 'bg-blue-500 text-white'
                                             : isStep1Complete(values)
-                                                ? "bg-white text-gray-500 cursor-pointer"
-                                                : "text-gray-400 cursor-not-allowed"
+                                              ? 'cursor-pointer bg-white text-gray-500'
+                                              : 'cursor-not-allowed text-gray-400'
                                     }`}
                                     onClick={() => {
                                         if (isStep1Complete(values)) {
@@ -1178,13 +1422,12 @@ export default function Create() {
                                 </div>
 
                                 <div
-                                    className={`inline-flex items-center justify-center whitespace-nowrap px-3 py-2 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow border
-                                    ${
+                                    className={`inline-flex items-center justify-center border px-3 py-2 text-sm font-medium whitespace-nowrap ring-offset-background transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow ${
                                         currentStep === 3
-                                            ? "bg-blue-500 text-white"
+                                            ? 'bg-blue-500 text-white'
                                             : isStep2Complete(values)
-                                                ? "bg-white text-gray-500 cursor-pointer"
-                                                : "text-gray-400 cursor-not-allowed"
+                                              ? 'cursor-pointer bg-white text-gray-500'
+                                              : 'cursor-not-allowed text-gray-400'
                                     }`}
                                     onClick={() => {
                                         if (isStep2Complete(values)) {
@@ -1200,13 +1443,20 @@ export default function Create() {
                                 <StepNavigation
                                     steps={steps}
                                     currentStep={sendSurveyStep}
-                                    onStepClick={(step) => setSendSurveyStep(step)}
+                                    onStepClick={(step) =>
+                                        setSendSurveyStep(step)
+                                    }
                                 />
                             )}
 
-                            <Form className='bg-white'>
-                                {RenderForm(touched, errors, values, setFieldValue)}
-                                <div className='py-6'>
+                            <Form className="bg-white">
+                                {RenderForm(
+                                    touched,
+                                    errors,
+                                    values,
+                                    setFieldValue,
+                                )}
+                                <div className="py-6">
                                     <Transition
                                         as="div"
                                         show={true}
@@ -1221,32 +1471,51 @@ export default function Create() {
                                             {currentStep > 0 && (
                                                 <Button
                                                     type="button"
-                                                    className='space-x-2'
-                                                    variant='outline'
+                                                    className="space-x-2"
+                                                    variant="outline"
                                                     onClick={() => {
-                                                        if (currentStep === 3 && sendSurveyStep > 0) {
-                                                            setSendSurveyStep(sendSurveyStep - 1);
+                                                        if (
+                                                            currentStep === 3 &&
+                                                            sendSurveyStep > 0
+                                                        ) {
+                                                            setSendSurveyStep(
+                                                                sendSurveyStep -
+                                                                    1,
+                                                            );
                                                         } else {
-                                                            setCurrentStep(currentStep - 1);
+                                                            setCurrentStep(
+                                                                currentStep - 1,
+                                                            );
                                                         }
                                                     }}
                                                 >
-                                                    <MoveLeft/>
+                                                    <MoveLeft />
                                                     <span>Back</span>
                                                 </Button>
                                             )}
                                             <Button
                                                 type="button"
                                                 variant="default"
-                                                className="px-6 py-3 text-base font-semibold border border-transparent rounded-lg shadow-sm focus:outline-none w-auto space-x-2"
-                                                onClick={() => handleNextStep(values, validateField, setTouched, errors)}
+                                                className="w-auto space-x-2 rounded-lg border border-transparent px-6 py-3 text-base font-semibold shadow-sm focus:outline-none"
+                                                onClick={() =>
+                                                    handleNextStep(
+                                                        values,
+                                                        validateField,
+                                                        setTouched,
+                                                        errors,
+                                                        submitForm, // Pass submitForm
+                                                    )
+                                                }
+                                                disabled={isSubmitting} // Optional: disable while submitting
                                             >
-                                                {currentStep === 3 && sendSurveyStep === 3 ? "Send Survey" : (
-                                                    <>
-                                                        <span>Next</span>
-                                                        <MoveRight/>
-                                                    </>
-                                                )}
+                                                {currentStep === 3 && sendSurveyStep === 3
+                                                    ? (isSubmitting ? "Sending..." : "Send Survey")
+                                                    : (
+                                                        <>
+                                                            <span>Next</span>
+                                                            <MoveRight/>
+                                                        </>
+                                                    )}
                                             </Button>
                                         </div>
                                     </Transition>
@@ -1255,8 +1524,7 @@ export default function Create() {
                         </>
                     )}
                 </Formik>
-
             </div>
         </AppLayout>
-    )
+    );
 }

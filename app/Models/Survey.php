@@ -26,6 +26,7 @@ class Survey extends Model
         'status',
         'branching_logic',
         'created_by',
+        'user_id',
     ];
 
     protected $casts = [

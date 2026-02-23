@@ -22,6 +22,10 @@ class Question extends Model
         'branching',
     ];
 
+    protected $casts = [
+        'branching' => 'array',
+    ];
+
     public function survey(): BelongsTo
     {
         return $this->belongsTo(Survey::class);
