@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import questions from '@/routes/questions';
+import surveysRoutes from '@/routes/surveys';
 import type { BreadcrumbItem } from '@/types';
 
 type SurveyStatus = 'draft' | 'active' | 'completed' | 'cancelled';
@@ -114,15 +115,25 @@ export default function Show() {
                 <Card className="overflow-hidden border-0 bg-gradient-to-r from-slate-900 to-slate-700 text-white shadow-lg">
                     <CardHeader className="space-y-4">
                         <div className="flex flex-wrap items-center justify-between gap-3">
-                            <Link href={questions.index().url}>
-                                <Button
-                                    variant="secondary"
-                                    className="bg-white/15 text-white hover:bg-white/25"
-                                >
-                                    <MoveLeft className="mr-2 h-4 w-4" />
-                                    Back to Surveys
-                                </Button>
-                            </Link>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Link href={questions.index().url}>
+                                    <Button
+                                        variant="secondary"
+                                        className="bg-white/15 text-white hover:bg-white/25"
+                                    >
+                                        <MoveLeft className="mr-2 h-4 w-4" />
+                                        Back to Surveys
+                                    </Button>
+                                </Link>
+                                <Link href={surveysRoutes.responses(survey.id).url}>
+                                    <Button
+                                        variant="secondary"
+                                        className="bg-white/15 text-white hover:bg-white/25"
+                                    >
+                                        View Responses
+                                    </Button>
+                                </Link>
+                            </div>
 
                             <Badge
                                 variant={statusVariant(survey.status)}

@@ -149,3 +149,90 @@ test('survey index is paginated and scoped to authenticated user', function (): 
             ->has('surveys.links')
         );
 });
+
+test('survey responses page is scoped to owner and returns paginated recipients', function (): void {
+    $owner = User::factory()->create();
+    $otherUser = User::factory()->create();
+
+    $survey = Survey::query()->create([
+        'name' => 'Responses Survey',
+        'description' => 'Survey with recipients',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDays(7)->toDateString(),
+        'trigger_word' => 'RESPONSES',
+        'completion_message' => null,
+        'invitation_message' => 'Reply START',
+        'scheduled_time' => now()->addDay(),
+        'status' => 'active',
+        'created_by' => $owner->id,
+    ]);
+
+    $ownerContacts = Contact::factory()->count(12)->create([
+        'user_id' => $owner->id,
+    ]);
+
+    foreach ($ownerContacts as $index => $contact) {
+        $survey->contacts()->attach($contact->id, [
+            'sent_at' => $index < 8 ? now() : null,
+        ]);
+    }
+
+    $response = $this->actingAs($owner)->get(route('surveys.responses', $survey));
+
+    $response
+        ->assertOk()
+        ->assertInertia(fn (Assert $page): Assert => $page
+            ->component('surveys/question/Responses')
+            ->where('survey.id', $survey->id)
+            ->where('stats.total_recipients', 12)
+            ->where('stats.sent_recipients', 8)
+            ->where('stats.pending_recipients', 4)
+            ->has('recipients.data', 10)
+        );
+
+    $forbiddenResponse = $this->actingAs($otherUser)->get(route('surveys.responses', $survey));
+    $forbiddenResponse->assertNotFound();
+});
+
+test('survey responses index is scoped and paginated for authenticated user', function (): void {
+    $user = User::factory()->create();
+    $otherUser = User::factory()->create();
+
+    foreach (range(1, 11) as $index) {
+        Survey::query()->create([
+            'name' => "Response Survey {$index}",
+            'description' => "Response description {$index}",
+            'start_date' => now()->toDateString(),
+            'end_date' => now()->addDays(7)->toDateString(),
+            'trigger_word' => "RESP-{$index}",
+            'completion_message' => null,
+            'invitation_message' => 'Reply START',
+            'scheduled_time' => now()->addDay(),
+            'status' => 'draft',
+            'created_by' => $user->id,
+        ]);
+    }
+
+    Survey::query()->create([
+        'name' => 'Other User Response Survey',
+        'description' => 'Should not be visible',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDays(7)->toDateString(),
+        'trigger_word' => 'OTHER-RESP',
+        'completion_message' => null,
+        'invitation_message' => 'Reply START',
+        'scheduled_time' => now()->addDay(),
+        'status' => 'draft',
+        'created_by' => $otherUser->id,
+    ]);
+
+    $response = $this->actingAs($user)->get(route('surveys.responses.index'));
+
+    $response
+        ->assertOk()
+        ->assertInertia(fn (Assert $page): Assert => $page
+            ->component('surveys/question/ResponsesIndex')
+            ->has('surveys.data', 10)
+            ->where('surveys.total', 11)
+        );
+});

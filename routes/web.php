@@ -19,7 +19,9 @@ Route::get('surveys/question', [SurveyController::class, 'index'])->name('questi
 Route::get('surveys/question/create', [SurveyController::class, 'create'])->name('questions.create')->middleware(['auth']);
 Route::post('surveys/question', [SurveyController::class, 'store'])->name('questions.store')->middleware(['auth']);
 // Route::get('surveys/question/{question}', [SurveyController::class, 'show'])->name('questions.show')->middleware(['auth']);
+Route::get('surveys/responses', [SurveyController::class, 'responsesIndex'])->middleware(['auth'])->name('surveys.responses.index');
 Route::get('surveys/{survey}', [SurveyController::class, 'show'])->middleware(['auth'])->name('surveys.show');
+Route::get('surveys/{survey}/responses', [SurveyController::class, 'responses'])->middleware(['auth'])->name('surveys.responses');
 
 Route::get('phonebook/contact', [contactController::class, 'index'])->name('contact.index')->middleware(['auth']);
 Route::get('phonebook/contact/create', [contactController::class, 'create'])->name('contact.create')->middleware(['auth']);

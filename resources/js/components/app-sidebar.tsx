@@ -10,7 +10,6 @@ import {
     MapPin,
     MessageSquare,
     User,
-    User2,
     Users,
 } from 'lucide-react';
 import { NavFooter } from '@/components/nav-footer';
@@ -30,6 +29,7 @@ import contact from '@/routes/contact';
 import contactgroup from '@/routes/contactgroup';
 import contactgroupmaps from '@/routes/contactgroupmaps';
 import questions from '@/routes/questions';
+import { index as surveyResponsesIndex } from '@/routes/surveys/responses';
 import type { NavItem } from '@/types';
 import AppLogo from './app-logo';
 
@@ -56,7 +56,7 @@ const mainNavItems: NavItem[] = [
             },
             {
                 title: 'Survey Responses',
-                href: '/surveys/responses',
+                href: surveyResponsesIndex(),
                 icon: MessageSquare,
             },
         ],

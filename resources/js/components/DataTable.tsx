@@ -35,14 +35,16 @@ interface DataTableProps<TData> {
     columns: ColumnDef<TData>[]
     data: TData[]
     filterColumn?: keyof TData | null
+    pageSize?: number
 }
 
-export function DataTable<TData>({ columns, data, filterColumn }: DataTableProps<TData>) {
+export function DataTable<TData>({ columns, data, filterColumn, pageSize = 10 }: DataTableProps<TData>) {
 
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
     const [rowSelection, setRowSelection] = React.useState({})
 
+    // eslint-disable-next-line react-hooks/incompatible-library
     const table = useReactTable({
         data,
         columns,
@@ -56,6 +58,11 @@ export function DataTable<TData>({ columns, data, filterColumn }: DataTableProps
             columnFilters,
             columnVisibility,
             rowSelection,
+        },
+        initialState: {
+            pagination: {
+                pageSize,
+            },
         },
     })
 
@@ -113,7 +120,7 @@ export function DataTable<TData>({ columns, data, filterColumn }: DataTableProps
                 {/*/>*/}
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="ml-auto cursor-pointer">
+                        <Button type="button" variant="outline" className="ml-auto cursor-pointer">
                             Filter Columns
                             <ChevronDown />
                         </Button>
@@ -142,7 +149,7 @@ export function DataTable<TData>({ columns, data, filterColumn }: DataTableProps
                     </DropdownMenuContent>
                 </DropdownMenu>
                 <div>
-                    <Button onClick={exportToCSV} className="cursor-pointer">
+                    <Button type="button" onClick={exportToCSV} className="cursor-pointer">
                         Download Data
                         <Download />
                     </Button>
@@ -202,6 +209,7 @@ export function DataTable<TData>({ columns, data, filterColumn }: DataTableProps
 
                 <div className="space-x-2 py-4">
                     <Button
+                        type="button"
                         variant="outline"
                         size="sm"
                         onClick={() => table.previousPage()}
@@ -210,6 +218,7 @@ export function DataTable<TData>({ columns, data, filterColumn }: DataTableProps
                         Previous
                     </Button>
                     <Button
+                        type="button"
                         variant="outline"
                         size="sm"
                         onClick={() => table.nextPage()}
