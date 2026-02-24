@@ -1,21 +1,23 @@
-import { Head, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
+import { PencilIcon, TrashIcon } from 'lucide-react';
+import { route } from 'ziggy-js';
 import { DataTable } from '@/components/DataTable';
 import NotFound from '@/components/NotFound';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import AppLayout from '@/layouts/app-layout';
-import contact from '@/routes/contact';
 import contactgroup from '@/routes/contactgroup';
 import type { BreadcrumbItem } from '@/types';
 
 interface ContactGroupProps {
-    id: number
-    name: string
-    status: string
-    user: {
-        id: number
-        name: string
-    }
+    id: number;
+    name: string;
+    status: string;
+    user?: {
+        id: number;
+        name: string;
+    };
 }
 
 
@@ -67,6 +69,35 @@ export default function Index() {
             accessorKey: "status",
             header: "Status",
         },
+        {
+            id: 'actions',
+            header: 'Actions',
+            cell: ({ row }) => (
+                <div className="flex items-center gap-2">
+                    <Link
+                        href={route('contactgroup.edit', row.original.id)}
+                        className="rounded-md border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-100"
+                    >
+                        <PencilIcon className="h-4 w-4" />
+                    </Link>
+                    <button
+                        type="button"
+                        className="rounded-md border border-red-200 p-2 text-red-600 transition hover:bg-red-50"
+                        onClick={() => {
+                            if (!confirm('Delete this contact group?')) {
+                                return;
+                            }
+
+                            router.delete(route('contactgroup.destroy', row.original.id));
+                        }}
+                    >
+                        <TrashIcon className="h-4 w-4" />
+                    </button>
+                </div>
+            ),
+            enableSorting: false,
+            enableHiding: false,
+        },
     ];
 
     return (
@@ -76,7 +107,7 @@ export default function Index() {
 
                 {contactgroups.length === 0 ? (
                     <div className="absolute inset-0 flex items-center justify-center">
-                        <NotFound title="contact" pathToCreate={contact.create().url} />
+                        <NotFound title="contact group" pathToCreate={route('contactgroup.create')} />
                     </div>
 
                 ) : (
@@ -86,6 +117,9 @@ export default function Index() {
                             <h1 className="text-3xl leading-10 font-semibold">
                                 Manage Contact Groups
                             </h1>
+                            <Link href={route('contactgroup.create')}>
+                                <Button>Create Contact Group</Button>
+                            </Link>
                         </div>
 
                         <div className="py-2">

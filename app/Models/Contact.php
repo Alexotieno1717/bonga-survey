@@ -19,15 +19,16 @@ class Contact extends Model
         'phone',
         'email',
         'gender',
+        'contact_group_id',
     ];
 
     protected $casts = [
-        'gender' => 'string'
+        'gender' => 'string',
     ];
 
     public function groups(): BelongsToMany
     {
-        return $this->belongsToMany(ContactGroup::class, 'contact_groups_maps', 'contact_id', 'group_id');
+        return $this->belongsToMany(ContactGroup::class, 'contact_group_maps', 'contact_id', 'contact_group_id');
     }
 
     public function group(): BelongsTo

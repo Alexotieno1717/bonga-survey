@@ -13,35 +13,45 @@ interface ContactGroupOption {
     name: string;
 }
 
+interface ContactPayload {
+    id: number;
+    names: string;
+    phone: string;
+    email: string | null;
+    gender: 'male' | 'female' | null;
+    contact_group_id: number | null;
+}
+
 const breadcrumbs: BreadcrumbItem[] = [
     {
-        title: 'Contact Creation',
-        href: contact.create().url,
+        title: 'Edit Contact',
+        href: contact.index().url,
     },
 ];
 
-export default function Create() {
-    const { contactGroups } = usePage().props as unknown as {
+export default function Edit() {
+    const { contact: contactData, contactGroups } = usePage().props as unknown as {
+        contact: ContactPayload;
         contactGroups: ContactGroupOption[];
     };
 
-    const { data, setData, post, processing, errors } = useForm({
-        names: '',
-        phone: '',
-        email: '',
-        gender: '',
-        contact_group_id: '',
+    const { data, setData, put, processing, errors } = useForm({
+        names: contactData.names,
+        phone: contactData.phone,
+        email: contactData.email ?? '',
+        gender: contactData.gender ?? '',
+        contact_group_id: contactData.contact_group_id ? String(contactData.contact_group_id) : '',
     });
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Create Contact" />
+            <Head title="Edit Contact" />
             <div className="mx-auto flex h-full w-full max-w-3xl flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
                 <div className="rounded-xl border bg-white p-6 shadow-sm">
                     <div className="pb-6">
-                        <h1 className="text-2xl font-semibold">Create Contact</h1>
+                        <h1 className="text-2xl font-semibold">Edit Contact</h1>
                         <p className="text-sm text-slate-600">
-                            Enter details to create a new contact.
+                            Update details for this contact.
                         </p>
                     </div>
 
@@ -49,12 +59,12 @@ export default function Create() {
                         className="space-y-6"
                         onSubmit={(event) => {
                             event.preventDefault();
-                            post(route('contact.store'), {
+                            put(route('contact.update', contactData.id), {
                                 onSuccess: () => {
-                                    toast.success('Contact created successfully.');
+                                    toast.success('Contact updated successfully.');
                                 },
                                 onError: () => {
-                                    toast.error('Failed to create contact. Please check the form.');
+                                    toast.error('Failed to update contact. Please check the form.');
                                 },
                             });
                         }}
@@ -142,7 +152,7 @@ export default function Create() {
                                 <Button type="button" variant="outline">Cancel</Button>
                             </Link>
                             <Button type="submit" disabled={processing}>
-                                {processing ? 'Creating...' : 'Create Single Contact'}
+                                {processing ? 'Updating...' : 'Update Contact'}
                             </Button>
                         </div>
                     </form>

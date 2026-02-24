@@ -5,67 +5,74 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Phonebook;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Phonebook\StoreContactGroupRequest;
+use App\Http\Requests\Phonebook\UpdateContactGroupRequest;
 use App\Models\ContactGroup;
-use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class ContactGroupController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function index(): Response
     {
         return Inertia::render('Phonebook/ContactGroup/Index', [
-            'contactgroups' => ContactGroup::with('user')->get(),
+            'contactgroups' => ContactGroup::query()
+                ->where('user_id', Auth::id())
+                ->with('user:id,name')
+                ->latest()
+                ->get(),
         ]);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create(): void
+    public function create(): Response
     {
-        //
+        return Inertia::render('Phonebook/ContactGroup/Create');
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request): void
+    public function store(StoreContactGroupRequest $request): RedirectResponse
     {
-        //
+        ContactGroup::query()->create([
+            ...$request->validated(),
+            'user_id' => Auth::id(),
+        ]);
+
+        return redirect()->route('contactgroup.index')
+            ->with('success', 'Contact group created successfully.');
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(ContactGroup $contactGroup): void
     {
         //
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(ContactGroup $contactGroup): void
+    public function edit(ContactGroup $contactGroup): Response
     {
-        //
+        abort_unless($contactGroup->user_id === Auth::id(), 403);
+
+        return Inertia::render('Phonebook/ContactGroup/Edit', [
+            'contactGroup' => $contactGroup,
+        ]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, ContactGroup $contactGroup): void
+    public function update(UpdateContactGroupRequest $request, ContactGroup $contactGroup): RedirectResponse
     {
-        //
+        abort_unless($contactGroup->user_id === Auth::id(), 403);
+
+        $contactGroup->update($request->validated());
+
+        return redirect()->route('contactgroup.index')
+            ->with('success', 'Contact group updated successfully.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(ContactGroup $contactGroup): void
+    public function destroy(ContactGroup $contactGroup): RedirectResponse
     {
-        //
+        abort_unless($contactGroup->user_id === Auth::id(), 403);
+
+        $contactGroup->delete();
+
+        return redirect()->route('contactgroup.index')
+            ->with('success', 'Contact group deleted successfully.');
     }
 }

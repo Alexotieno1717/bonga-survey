@@ -1,5 +1,7 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
+import { PencilIcon, TrashIcon } from 'lucide-react';
+import { route } from 'ziggy-js';
 import { DataTable } from '@/components/DataTable';
 import NotFound from '@/components/NotFound';
 import { Button } from '@/components/ui/button';
@@ -14,6 +16,7 @@ interface ContactProps {
     email: string;
     phone: string;
     gender: string;
+    contact_group_id?: number | null;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -65,6 +68,35 @@ export default function Index() {
         {
             accessorKey: "gender",
             header: "Gender",
+        },
+        {
+            id: 'actions',
+            header: 'Actions',
+            cell: ({ row }) => (
+                <div className="flex items-center gap-2">
+                    <Link
+                        href={route('contact.edit', row.original.id)}
+                        className="rounded-md border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-100"
+                    >
+                        <PencilIcon className="h-4 w-4" />
+                    </Link>
+                    <button
+                        type="button"
+                        className="rounded-md border border-red-200 p-2 text-red-600 transition hover:bg-red-50"
+                        onClick={() => {
+                            if (!confirm('Delete this contact?')) {
+                                return;
+                            }
+
+                            router.delete(route('contact.destroy', row.original.id));
+                        }}
+                    >
+                        <TrashIcon className="h-4 w-4" />
+                    </button>
+                </div>
+            ),
+            enableSorting: false,
+            enableHiding: false,
         },
     ];
 

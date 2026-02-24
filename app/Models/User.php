@@ -54,12 +54,12 @@ class User extends Authenticatable
         ];
     }
 
-    public function contacts(): User|HasMany
+    public function contacts(): HasMany
     {
         return $this->hasMany(Contact::class);
     }
 
-    public function contactGroups(): User|HasMany
+    public function contactGroups(): HasMany
     {
         return $this->hasMany(ContactGroup::class);
     }

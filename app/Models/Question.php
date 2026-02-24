@@ -8,6 +8,7 @@ use Database\Factories\QuestionFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Question extends Model
 {
@@ -18,7 +19,9 @@ class Question extends Model
         'survey_id',
         'question',
         'response_type',
+        'free_text_description',
         'allow_multiple',
+        'order',
         'branching',
     ];
 
@@ -31,8 +34,8 @@ class Question extends Model
         return $this->belongsTo(Survey::class);
     }
 
-    public function options()
+    public function options(): HasMany
     {
-        return $this->hasMany(Option::class);
+        return $this->hasMany(Option::class)->orderBy('order');
     }
 }

@@ -5,28 +5,24 @@ import { Calendar } from '@/components/ui/calendar';
 interface DatePickerProps {
     name: string;
     minDate?: Date;
+    onSelectDate?: (date: Date | undefined) => void;
 }
 
-const DatePicker: FC<DatePickerProps> = ({ name, minDate }) => {
-    const [field, meta, helpers] = useField<Date | undefined>(name);
+const DatePicker: FC<DatePickerProps> = ({ name, minDate, onSelectDate }) => {
+    const [field, , helpers] = useField<Date | null>(name);
 
     return (
         <Calendar
             mode="single"
             selected={field.value ? new Date(field.value) : undefined}
-            onSelect={(date) => helpers.setValue(date)}
+            onSelect={(date) => {
+                helpers.setValue(date ?? null);
+                onSelectDate?.(date);
+            }}
             disabled={(date) => (minDate ? date < minDate : false)}
             initialFocus
-            fromDate={minDate} // ✅ Set minDate for future selection
+            fromDate={minDate}
         />
-        // <Calendar
-        // 	mode="single"
-        // 	selected={field.value ?? undefined}
-        // 	onSelect={(date) => helpers.setValue(date)}
-        // 	disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-        // 	initialFocus
-        // 	fromDate={minDate}
-        // />
     );
 };
 

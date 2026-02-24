@@ -5,67 +5,123 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Phonebook;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Phonebook\StoreContactGroupMapRequest;
+use App\Http\Requests\Phonebook\UpdateContactGroupMapRequest;
+use App\Models\Contact;
+use App\Models\ContactGroup;
 use App\Models\ContactGroupMap;
-use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
+use Inertia\Response;
 
 class ContactGroupMapController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function index(): Response
     {
         return Inertia::render('Phonebook/ContactGroupMap/Index', [
-            'contactgroupmaps' => ContactGroupMap::all(),
+            'contactgroupmaps' => ContactGroupMap::query()
+                ->where('user_id', Auth::id())
+                ->with(['contact:id,names,phone,email', 'contactGroup:id,name'])
+                ->latest()
+                ->get(),
         ]);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create(): void
+    public function create(): Response
     {
-        //
+        return Inertia::render('Phonebook/ContactGroupMap/Create', [
+            'contacts' => Contact::query()
+                ->where('user_id', Auth::id())
+                ->orderBy('names')
+                ->get(['id', 'names', 'phone']),
+            'contactGroups' => ContactGroup::query()
+                ->where('user_id', Auth::id())
+                ->orderBy('name')
+                ->get(['id', 'name']),
+        ]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request): void
+    public function store(StoreContactGroupMapRequest $request): RedirectResponse
     {
-        //
+        $validated = $request->validated();
+
+        $contact = Contact::query()
+            ->where('user_id', Auth::id())
+            ->findOrFail((int) $validated['contact_id']);
+
+        $group = ContactGroup::query()
+            ->where('user_id', Auth::id())
+            ->findOrFail((int) $validated['contact_group_id']);
+
+        ContactGroupMap::query()->create([
+            'user_id' => Auth::id(),
+            'contact_id' => $contact->id,
+            'contact_group_id' => $group->id,
+            'group' => $group->name,
+            'phone' => (string) $contact->phone,
+            'status' => $validated['status'],
+        ]);
+
+        return redirect()->route('contactgroupmaps.index')
+            ->with('success', 'Contact group mapping created successfully.');
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show(ContactGroupMap $contactGroupMap): void
     {
         //
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(ContactGroupMap $contactGroupMap): void
+    public function edit(ContactGroupMap $contactGroupMap): Response
     {
-        //
+        abort_unless($contactGroupMap->user_id === Auth::id(), 403);
+
+        return Inertia::render('Phonebook/ContactGroupMap/Edit', [
+            'contactGroupMap' => $contactGroupMap,
+            'contacts' => Contact::query()
+                ->where('user_id', Auth::id())
+                ->orderBy('names')
+                ->get(['id', 'names', 'phone']),
+            'contactGroups' => ContactGroup::query()
+                ->where('user_id', Auth::id())
+                ->orderBy('name')
+                ->get(['id', 'name']),
+        ]);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, ContactGroupMap $contactGroupMap): void
+    public function update(UpdateContactGroupMapRequest $request, ContactGroupMap $contactGroupMap): RedirectResponse
     {
-        //
+        abort_unless($contactGroupMap->user_id === Auth::id(), 403);
+
+        $validated = $request->validated();
+
+        $contact = Contact::query()
+            ->where('user_id', Auth::id())
+            ->findOrFail((int) $validated['contact_id']);
+
+        $group = ContactGroup::query()
+            ->where('user_id', Auth::id())
+            ->findOrFail((int) $validated['contact_group_id']);
+
+        $contactGroupMap->update([
+            'contact_id' => $contact->id,
+            'contact_group_id' => $group->id,
+            'group' => $group->name,
+            'phone' => (string) $contact->phone,
+            'status' => $validated['status'],
+        ]);
+
+        return redirect()->route('contactgroupmaps.index')
+            ->with('success', 'Contact group mapping updated successfully.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(ContactGroupMap $contactGroupMap): void
+    public function destroy(ContactGroupMap $contactGroupMap): RedirectResponse
     {
-        //
+        abort_unless($contactGroupMap->user_id === Auth::id(), 403);
+
+        $contactGroupMap->delete();
+
+        return redirect()->route('contactgroupmaps.index')
+            ->with('success', 'Contact group mapping deleted successfully.');
     }
 }

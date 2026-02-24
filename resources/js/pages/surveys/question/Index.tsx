@@ -1,10 +1,12 @@
 import { Head, Link, usePage } from '@inertiajs/react';
-import { PencilIcon, TrashIcon } from 'lucide-react';
+import { format } from 'date-fns';
+import { PencilIcon, Search, TrashIcon } from 'lucide-react';
 import NotFound from '@/components/NotFound';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import contact from '@/routes/contact';
 import questions from '@/routes/questions';
+import surveysRoutes from '@/routes/surveys';
 import type { BreadcrumbItem } from '@/types';
 
 
@@ -39,6 +41,19 @@ export interface SurveyFetchProps {
     updated_at: string;
 }
 
+interface PaginationLink {
+    url: string | null;
+    label: string;
+    active: boolean;
+}
+
+interface SurveysPagination {
+    data: SurveyFetchProps[];
+    links: PaginationLink[];
+    total: number;
+    from: number | null;
+    to: number | null;
+}
 
 const breadcrumbs: BreadcrumbItem[] = [
     {
@@ -52,17 +67,30 @@ export default function Index() {
     // const surveys = usePage().props.surveys;
 
     const { surveys } = usePage().props as unknown as {
-        surveys: SurveyFetchProps[];
+        surveys: SurveysPagination;
     };
 
-    console.log(surveys);
+    const statusStyles: Record<SurveyStatus, string> = {
+        draft: 'bg-slate-100 text-slate-700 border border-slate-200',
+        scheduled: 'bg-amber-100 text-amber-700 border border-amber-200',
+        active: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+        completed: 'bg-blue-100 text-blue-700 border border-blue-200',
+    };
+
+    const cleanPaginationLabel = (label: string): string => {
+        return label
+            .replace(/<[^>]*>/g, '')
+            .replace(/&laquo;/g, '«')
+            .replace(/&raquo;/g, '»')
+            .trim();
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Surveys Questions" />
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
                 <div className="rounded-lg bg-white py-4">
-                    {surveys.length === 0 ? (
+                    {surveys.data.length === 0 ? (
                         <div className="absolute inset-0 flex items-center justify-center">
                             <NotFound
                                 title="contact"
@@ -71,21 +99,28 @@ export default function Index() {
                         </div>
                     ) : (
                         <>
-                            {/* HEADER */}
-                            <div className="flex justify-between">
-                                <h1 className="text-3xl leading-10 font-semibold">
-                                    Manage Survey Questions
-                                </h1>
-                            </div>
+                            <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5 shadow-sm md:p-6">
+                                <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+                                    <div>
+                                        <p className="text-xs tracking-[0.16em] text-slate-500 uppercase">
+                                            Survey Workspace
+                                        </p>
+                                        <h1 className="mt-1 text-2xl font-semibold text-slate-900 md:text-3xl">
+                                            Manage Survey Questions
+                                        </h1>
+                                        <p className="mt-1 text-sm text-slate-600">
+                                            Search and refine surveys before opening full question details.
+                                        </p>
+                                    </div>
+                                </div>
 
-                            <div className="px-6">
-                                <form action="">
-                                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                                        <div className="space-y-[6px]">
-                                            <label className="text text-sm">
+                                <form action="" className="space-y-5">
+                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-700">
                                                 Survey
                                             </label>
-                                            <select className="placeholder-text-muted-foreground h-10 w-full rounded-[8px] border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-1 focus:ring-ring focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50">
+                                            <select className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50">
                                                 <option value="">
                                                     Select survey ...
                                                 </option>
@@ -101,11 +136,11 @@ export default function Index() {
                                             </select>
                                         </div>
 
-                                        <div className="space-y-[6px]">
-                                            <label className="text text-sm">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-700">
                                                 Survey Question
                                             </label>
-                                            <select className="placeholder-text-muted-foreground h-10 w-full rounded-[8px] border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-1 focus:ring-ring focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50">
+                                            <select className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50">
                                                 <option value="">
                                                     Select survey question ...
                                                 </option>
@@ -122,11 +157,16 @@ export default function Index() {
                                         </div>
                                     </div>
 
-                                    <div className="flex items-end justify-end space-x-3 pt-[17px]">
-                                        <Button variant="outline">Reset</Button>
-                                        <Button>Search</Button>
+                                    <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 pt-4">
+                                        <Button variant="outline" className="min-w-24">
+                                            Reset
+                                        </Button>
+                                        <Button className="min-w-24">
+                                            <Search className="mr-2 h-4 w-4" />
+                                            Search
+                                        </Button>
                                         <Link href={questions.create().url}>
-                                            <Button>
+                                            <Button className="bg-blue-600 hover:bg-blue-700">
                                                 Create Survey Question
                                             </Button>
                                         </Link>
@@ -135,67 +175,93 @@ export default function Index() {
                             </div>
 
                             <div className="py-14">
-                                {surveys.map(
+                                {surveys.data.map(
                                     (
                                         survey: SurveyFetchProps,
-                                        index: number,
                                     ) => (
-                                        <div
-                                            className="mb-4 rounded-lg border border-gray-100 bg-white p-2 shadow-md md:p-3"
-                                            key={index}
+                                        <Link
+                                            href={surveysRoutes.show(survey.id).url}
+                                            key={survey.id}
+                                            className="mb-4 block rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
                                         >
-                                            <div className="mb-4 flex flex-col space-y-1 md:flex-row md:items-center md:justify-between md:space-y-0">
-                                                <div>
-                                                    <p className="hidden pb-0 text-sm text-gray-400 md:block md:pb-6">
+                                            <div className="grid grid-cols-1 gap-4 md:grid-cols-12 md:items-start">
+                                                <div className="md:col-span-4">
+                                                    <p className="text-xs tracking-wide text-slate-500 uppercase">
                                                         Survey title
                                                     </p>
-                                                    <span className="text-sm font-semibold md:text-lg">
+                                                    <h3 className="mt-1 line-clamp-2 text-base font-semibold text-slate-900 md:text-lg">
                                                         {survey.name}
-                                                    </span>
+                                                    </h3>
                                                 </div>
-                                                <div>
-                                                    <p className="hidden pb-0 text-sm text-gray-400 md:block md:pb-6">
+                                                <div className="md:col-span-4">
+                                                    <p className="text-xs tracking-wide text-slate-500 uppercase">
                                                         Description
                                                     </p>
-                                                    <span className="text-sm font-semibold md:text-lg">
+                                                    <p className="mt-1 line-clamp-2 text-sm text-slate-700 md:text-base">
                                                         {survey.description}
-                                                    </span>
+                                                    </p>
                                                 </div>
-                                                <div className="flex flex-row space-x-2 md:flex-col md:space-x-0">
-                                                    <p className="pb-0 text-sm text-gray-400 md:pb-6">
+                                                <div className="md:col-span-2">
+                                                    <p className="text-xs tracking-wide text-slate-500 uppercase">
                                                         Status
                                                     </p>
                                                     <span
-                                                        className={`rounded-full bg-gray-200 px-2 py-1 text-xs text-gray-800 md:px-3`}
+                                                        className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-medium capitalize ${statusStyles[survey.status]}`}
                                                     >
                                                         {survey.status}
                                                     </span>
                                                 </div>
-                                                <div className="hidden md:block">
-                                                    <p className="pb-0 text-sm text-gray-400 md:pb-6">
+                                                <div className="md:col-span-2">
+                                                    <p className="text-xs tracking-wide text-slate-500 uppercase">
                                                         Date
                                                     </p>
-                                                    <span className="text-sm text-gray-400">
-                                                        {survey.created_at}
+                                                    <span className="mt-1 block text-sm text-slate-600">
+                                                        {format(new Date(survey.created_at), 'MMM d, yyyy')}
                                                     </span>
-                                                </div>
-                                                <div>
-                                                    <span className="hidden text-sm text-gray-400 md:block">
-                                                        Actions
-                                                    </span>
-                                                    <div className="mt-3 flex space-x-3 md:mt-6 md:justify-center">
-                                                        <button className="">
-                                                            <PencilIcon />
+                                                    <div className="mt-3 flex items-center gap-2">
+                                                        <button className="rounded-md border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-100">
+                                                            <PencilIcon className="h-4 w-4" />
                                                         </button>
-                                                        <button className="text-red-600 hover:text-red-800">
-                                                            <TrashIcon />
+                                                        <button className="rounded-md border border-red-200 p-2 text-red-600 transition hover:bg-red-50">
+                                                            <TrashIcon className="h-4 w-4" />
                                                         </button>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        </Link>
                                     ),
                                 )}
+
+                                <div className="mt-8 flex flex-col gap-3 border-t border-slate-200 pt-4 md:flex-row md:items-center md:justify-between">
+                                    <p className="text-sm text-slate-600">
+                                        Showing {surveys.from ?? 0} to {surveys.to ?? 0} of {surveys.total} surveys
+                                    </p>
+
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {surveys.links.map((link, index) =>
+                                            link.url ? (
+                                                <Link
+                                                    key={index}
+                                                    href={link.url}
+                                                    className={`rounded-md border px-3 py-1.5 text-sm transition ${
+                                                        link.active
+                                                            ? 'border-blue-600 bg-blue-600 text-white'
+                                                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
+                                                    }`}
+                                                >
+                                                    {cleanPaginationLabel(link.label)}
+                                                </Link>
+                                            ) : (
+                                                <span
+                                                    key={index}
+                                                    className="cursor-not-allowed rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 text-sm text-slate-400"
+                                                >
+                                                    {cleanPaginationLabel(link.label)}
+                                                </span>
+                                            ),
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </>
                     )}

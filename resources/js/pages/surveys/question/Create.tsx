@@ -6,7 +6,6 @@ import type {
     FormikErrors,
     FormikHelpers,
     FormikTouched,
-    FormikValues,
 } from 'formik';
 import {
     ErrorMessage,
@@ -24,7 +23,7 @@ import {
     TriangleAlert,
     UserPlus,
 } from 'lucide-react';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { toast } from 'sonner';
 import * as Yup from 'yup';
 import AddContactsModal from '@/components/AddContactsModal';
@@ -35,21 +34,22 @@ import { Button } from '@/components/ui/button';
 import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
+import questions from '@/routes/questions';
 
 interface Question {
     question: string;
-    responseType: "free-text" | "multiple-choice";
+    responseType: 'free-text' | 'multiple-choice';
     options: string[];
     allowMultiple?: boolean;
     freeTextDescription?: string;
     isSaved?: boolean;
     isSaving?: boolean;
     isEditing?: boolean;
-    branching?: string | number | (string | number)[] | null; // Accept various types
+    branching?: string | number | (string | number)[] | null;
 }
 
 interface Contact {
-    id: string;
+    id: number;
     names: string;
     phone: string;
     email: string;
@@ -71,19 +71,22 @@ const steps = [
     { id: 3, label: "Invitation" },
     { id: 4, label: "Send" },
 ];
+const today = new Date();
+today.setHours(0, 0, 0, 0);
 
 interface FormValues {
     isCompletionMessageSaved?: boolean;
+    isSavingCompletionMessage?: boolean;
     surveyName: string;
     description: string;
-    startDate: string;
-    endDate: string;
+    startDate: Date | null;
+    endDate: Date | null;
     triggerWord: string;
     questions: Question[];
     completionMessage?: string;
-    recipients: Contact[]; // This should always be an array
-    recipientSelectionType: 'all' | 'select'; // Add this to track radio selection
-    selectedContactIds: number[]; // Add this to track selected contacts
+    recipients: Contact[];
+    recipientSelectionType: 'all' | 'select';
+    selectedContactIds: number[];
     invitationMessage: string;
     scheduleTime: string;
 }
@@ -91,8 +94,8 @@ interface FormValues {
 const initialValues: FormValues = {
     surveyName: '',
     description: '',
-    startDate: '',
-    endDate: '',
+    startDate: new Date(today),
+    endDate: null,
     triggerWord: '',
     questions: [
         {
@@ -101,13 +104,15 @@ const initialValues: FormValues = {
             options: [],
             allowMultiple: false,
             freeTextDescription: '',
+            isSaved: true,
             branching: undefined,
         },
     ],
     completionMessage: '',
-    recipients: [], // Initialize as empty array
-    recipientSelectionType: 'select', // Default to 'select'
-    selectedContactIds: [], // Initialize empty selected contacts
+    isSavingCompletionMessage: false,
+    recipients: [],
+    recipientSelectionType: 'select',
+    selectedContactIds: [],
     invitationMessage: '',
     scheduleTime: '',
 };
@@ -115,7 +120,9 @@ const initialValues: FormValues = {
 const validationSchema = Yup.object().shape({
     surveyName: Yup.string().required("Survey Name is required"),
     description: Yup.string().required("Description is required"),
-    startDate: Yup.date().required("Start date is required"),
+    startDate: Yup.date()
+        .min(today, 'Start date cannot be in the past')
+        .required("Start date is required"),
     endDate: Yup.date()
         .min(Yup.ref("startDate"), "End Date must be after start date")
         .required("End date is required"),
@@ -138,35 +145,23 @@ const validationSchema = Yup.object().shape({
         })
     ),
     completionMessage: Yup.string().notRequired(),
-
 });
 
 export default function Create() {
-    const [currentStep, setCurrentStep] = useState<0 | 1 | 2 | 3 | number>(0); // 0: Survey Details, 1: Questions, 2: Survey Outro, 3: Send Survey
-    const [sendSurveyStep, setSendSurveyStep] = useState<
-        0 | 1 | 2 | 3 | number
-    >(0); // 0: Add Recipients, 1: Review Recipients, 2: Invitation, 3: Send
-    const [isDisabled, setDisabled] = useState(false);
+    const [currentStep, setCurrentStep] = useState<number>(0);
+    const [sendSurveyStep, setSendSurveyStep] = useState<number>(0);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const [deleteConfirmation, setDeleteConfirmation] = useState<{
         isOpen: boolean;
         questionIndex: number | null;
-    }>({ isOpen: false, questionIndex: null, });
+    }>({ isOpen: false, questionIndex: null });
 
     const { contacts } = usePage<PageProps>().props;
 
-    console.log(contacts)
-
-    // const handleFormStep = (step: number) => {
-    //     if (step < 4) {
-    //         setCurrentStep(step);
-    //     }
-    // }
-
     const handleDeleteQuestion = (
-        values: FormikValues,
-        setFieldValue: (field: string, value: any) => void,
+        values: FormValues,
+        setFieldValue: (field: string, value: unknown) => void,
     ) => {
         if (deleteConfirmation.questionIndex !== null) {
             const newQuestions = values.questions.filter(
@@ -183,9 +178,10 @@ export default function Create() {
                         options: [],
                         allowMultiple: false,
                         freeTextDescription: '',
-                        isSaved: false,
+                        isSaved: true,
                         isSaving: false,
                         isEditing: false,
+                        branching: null,
                     },
                 ]);
             } else {
@@ -201,11 +197,11 @@ export default function Create() {
         });
     };
 
-    function RenderForm(
-        touched: FormikTouched<FormikValues>,
-        errors: FormikErrors<FormikValues>,
-        values: FormikValues,
-        setFieldValue: (field: string, value: any) => void,
+    function renderForm(
+        touched: FormikTouched<FormValues>,
+        errors: FormikErrors<FormValues>,
+        values: FormValues,
+        setFieldValue: (field: string, value: unknown) => void,
     ) {
         switch (currentStep) {
             case 0: // Survey Details
@@ -268,7 +264,19 @@ export default function Create() {
                                             </Button>
                                         </PopoverTrigger>
                                         <PopoverContent className="w-auto p-0" align="start">
-                                            <DatePicker name="startDate"/>
+                                            <DatePicker
+                                                name="startDate"
+                                                minDate={today}
+                                                onSelectDate={(date) => {
+                                                    if (!date) {
+                                                        return;
+                                                    }
+
+                                                    if (values.endDate && values.endDate < date) {
+                                                        setFieldValue('endDate', null);
+                                                    }
+                                                }}
+                                            />
                                         </PopoverContent>
                                     </Popover>
                                     {errors.startDate && touched.startDate ? (
@@ -301,7 +309,7 @@ export default function Create() {
                                         <PopoverContent className="w-auto p-0" align="start">
                                             <DatePicker
                                                 name="endDate"
-                                                minDate={values.startDate ? new Date(values.startDate) : new Date()}
+                                                minDate={values.startDate ?? today}
                                             />
                                         </PopoverContent>
                                     </Popover>
@@ -477,13 +485,12 @@ export default function Create() {
                                         {question.responseType === "free-text" && (
                                             <div className='flex-1 space-y-1.5 mt-4'>
                                                 <label className="block text-sm font-medium">Explanation (Optional)</label>
-                                                <Field
-                                                    name={`questions[${index}].freeTextDescription`}
-                                                    as="textarea"
-                                                    className="w-full px-4 py-2 border rounded-md"
+                                                <textarea
+                                                    value=""
+                                                    readOnly
+                                                    disabled
+                                                    className="w-full rounded-md border border-gray-200 bg-gray-100 px-4 py-2 text-gray-500"
                                                     placeholder="Participants will give an open-ended answer..."
-                                                    onClick={(e: any) => setDisabled(!isDisabled)}
-                                                    disabled={isDisabled}
                                                 />
                                             </div>
                                         )}
@@ -579,29 +586,27 @@ export default function Create() {
                             ))}
 
                             {/* Show "Add New Question" button only if all questions are saved */}
-                            {values.questions.every((q: Question) => q.isSaved) && (
-                                <div className='flex justify-end items-center py-4'>
-                                    <Button
-                                        type="button"
-                                        onClick={() => {
-                                            const newQuestion = {
-                                                question: '',
-                                                responseType: "free-text",
-                                                options: [],
-                                                allowMultiple: false,
-                                                freeTextDescription: '',
-                                                isSaved: false,
-                                                isSaving: false,
-                                                isEditing: false,
-                                                branching: null
-                                            };
-                                            setFieldValue("questions", [...values.questions, newQuestion]);
-                                        }}
-                                    >
-                                        Add New Question
-                                    </Button>
-                                </div>
-                            )}
+                            <div className='flex justify-end items-center py-4'>
+                                <Button
+                                    type="button"
+                                    onClick={() => {
+                                        const newQuestion = {
+                                            question: '',
+                                            responseType: "free-text",
+                                            options: [],
+                                            allowMultiple: false,
+                                            freeTextDescription: '',
+                                            isSaved: true,
+                                            isSaving: false,
+                                            isEditing: false,
+                                            branching: null
+                                        };
+                                        setFieldValue("questions", [...values.questions, newQuestion]);
+                                    }}
+                                >
+                                    Add New Question
+                                </Button>
+                            </div>
 
                             <hr />
                         </div>
@@ -832,12 +837,10 @@ export default function Create() {
                                             onClose={() => setIsModalOpen(false)}
                                             onAddRecipient={(newRecipient) => {
                                                 const newContact: Contact = {
-                                                    id: String(Date.now()),
-                                                    names: newRecipient.names,
+                                                    id: Date.now(),
+                                                    names: newRecipient.name,
                                                     phone: newRecipient.phone,
                                                     email: newRecipient.email || '',
-                                                    // gender: newRecipient.gender,
-                                                    // contact_group_id: newRecipient.contact_group_id
                                                 };
 
                                                 // Update the Formik recipients field
@@ -1108,14 +1111,13 @@ export default function Create() {
         values: FormValues,
         { setSubmitting }: FormikHelpers<FormValues>,
     ) => {
-        console.log(values)
         try {
             // Transform the data to match the backend expectations
             const surveyData = {
                 surveyName: values.surveyName,
                 description: values.description,
-                startDate: values.startDate,
-                endDate: values.endDate,
+                startDate: values.startDate ? format(values.startDate, 'yyyy-MM-dd') : '',
+                endDate: values.endDate ? format(values.endDate, 'yyyy-MM-dd') : '',
                 triggerWord: values.triggerWord,
                 completionMessage: values.completionMessage,
                 invitationMessage: values.invitationMessage,
@@ -1150,21 +1152,18 @@ export default function Create() {
                     contact_group_id: r.contact_group_id,
                 })),
             };
-            console.log(values)
 
             // Submit using Inertia
-            router.post('/surveys/question', surveyData, {
+            router.post(questions.store().url, surveyData, {
                 onSuccess: () => {
                     toast.success('Survey created successfully!', {
                         position: 'top-center',
                         richColors: true,
                     });
-                    console.log(values)
-                    router.visit('/surveys/question');
+                    router.visit(questions.index().url);
                 },
-                onError: (errors) => {
-                    console.log(values);
-                    console.error('Validation errors:', errors);
+                onError: (validationErrors) => {
+                    console.error('Validation errors:', validationErrors);
                     toast.error(
                         'Failed to create survey. Please check your inputs.',
                         {
@@ -1188,7 +1187,7 @@ export default function Create() {
     };
 
     function handleNextStep(
-        values: FormikValues,
+        values: FormValues,
         validateField: (
             field: string,
         ) => Promise<void> | Promise<string | undefined>,
@@ -1243,11 +1242,11 @@ export default function Create() {
                         (question: {
                             question: string;
                             responseType: 'free-text' | 'multiple-choice';
-                            isSaved: boolean;
+                            options: string[];
                         }) =>
                             !question.question ||
                             !question.responseType ||
-                            !question.isSaved,
+                            (question.responseType === 'multiple-choice' && question.options.length === 0),
                     )
                 ) {
                     values.questions.forEach((_: Question, index: number) => {
@@ -1323,35 +1322,27 @@ export default function Create() {
         }
     }
 
-    const isStep0Complete = (values: FormikValues) => {
-        return (
+    const isStep0Complete = (values: FormValues): boolean => {
+        return Boolean(
             values.surveyName &&
-            values.description &&
-            values.startDate &&
-            values.endDate &&
-            values.triggerWord
+                values.description &&
+                values.startDate &&
+                values.endDate &&
+                values.triggerWord,
         );
     };
 
-    const isStep1Complete = (values: FormikValues) => {
+    const isStep1Complete = (values: FormValues): boolean => {
         return values.questions.every(
             (question: Question) =>
                 question.question &&
                 question.responseType &&
-                (question.responseType === "free-text" || question.options.length > 0)
+                (question.responseType === "free-text" || question.options.length > 0),
         );
     };
 
-    const isStep2Complete = (values: FormikValues) => {
-        return values.completionMessage;
-    };
-
-    const isStep3Complete = (values: FormValues) => {
-        return values.recipients.length > 0;
-    };
-
-    const isStep4Complete = (values: FormValues) => {
-        return values.invitationMessage && values.scheduleTime;
+    const isStep2Complete = (): boolean => {
+        return true;
     };
 
 
@@ -1425,12 +1416,12 @@ export default function Create() {
                                     className={`inline-flex items-center justify-center border px-3 py-2 text-sm font-medium whitespace-nowrap ring-offset-background transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow ${
                                         currentStep === 3
                                             ? 'bg-blue-500 text-white'
-                                            : isStep2Complete(values)
+                                            : isStep2Complete()
                                               ? 'cursor-pointer bg-white text-gray-500'
                                               : 'cursor-not-allowed text-gray-400'
                                     }`}
                                     onClick={() => {
-                                        if (isStep2Complete(values)) {
+                                        if (isStep2Complete()) {
                                             setCurrentStep(3);
                                         }
                                     }}
@@ -1450,7 +1441,7 @@ export default function Create() {
                             )}
 
                             <Form className="bg-white">
-                                {RenderForm(
+                                {renderForm(
                                     touched,
                                     errors,
                                     values,

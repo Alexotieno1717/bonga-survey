@@ -7,7 +7,7 @@ type AddContactsModalProps = {
     isOpen: boolean; // `isOpen` should be a boolean indicating if the modal is visible.
     onClose: () => void; // `onClose` is a function that closes the modal, with no arguments and no return value.
     onAddRecipient: (recipient: {
-        names: string;
+        name: string;
         phone: string;
         email: string;
     }) => void; // Callback to add a new recipient

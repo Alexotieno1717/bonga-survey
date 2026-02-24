@@ -14,13 +14,19 @@ class ContactGroup extends Model
     use HasFactory;
 
     protected $fillable = [
-        'names',
+        'user_id',
+        'name',
         'status',
     ];
 
     public function contacts(): HasMany
     {
         return $this->hasMany(Contact::class);
+    }
+
+    public function mappings(): HasMany
+    {
+        return $this->hasMany(ContactGroupMap::class);
     }
 
     public function user(): BelongsTo

@@ -14,7 +14,11 @@ class Option extends Model
     /** @use HasFactory<OptionFactory> */
     use HasFactory;
 
-    protected $fillable = ['question_id', 'option_text'];
+    protected $fillable = ['question_id', 'option', 'order', 'branching'];
+
+    protected $casts = [
+        'branching' => 'array',
+    ];
 
     public function question(): BelongsTo
     {
