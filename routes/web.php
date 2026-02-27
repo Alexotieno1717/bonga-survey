@@ -21,6 +21,10 @@ Route::post('surveys/question', [SurveyController::class, 'store'])->name('quest
 // Route::get('surveys/question/{question}', [SurveyController::class, 'show'])->name('questions.show')->middleware(['auth']);
 Route::get('surveys/responses', [SurveyController::class, 'responsesIndex'])->middleware(['auth'])->name('surveys.responses.index');
 Route::get('surveys/{survey}', [SurveyController::class, 'show'])->middleware(['auth'])->name('surveys.show');
+Route::put('surveys/{survey}/questions/{question}', [SurveyController::class, 'updateQuestion'])->middleware(['auth'])->name('surveys.questions.update');
+Route::patch('surveys/{survey}/cancel', [SurveyController::class, 'cancel'])->middleware(['auth'])->name('surveys.cancel');
+Route::patch('surveys/{survey}/reactivate', [SurveyController::class, 'reactivate'])->middleware(['auth'])->name('surveys.reactivate');
+Route::delete('surveys/{survey}', [SurveyController::class, 'destroy'])->middleware(['auth'])->name('surveys.destroy');
 Route::get('surveys/{survey}/responses', [SurveyController::class, 'responses'])->middleware(['auth'])->name('surveys.responses');
 
 Route::get('phonebook/contact', [contactController::class, 'index'])->name('contact.index')->middleware(['auth']);

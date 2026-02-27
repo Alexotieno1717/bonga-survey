@@ -1,8 +1,10 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { PencilIcon, TrashIcon } from 'lucide-react';
+import { useState } from 'react';
 import { route } from 'ziggy-js';
 import { DataTable } from '@/components/DataTable';
+import DeleteConfirmationDialog from '@/components/DeleteConfirmationDialog';
 import NotFound from '@/components/NotFound';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -29,6 +31,7 @@ export default function Index() {
     const { contacts } = usePage().props as unknown as {
         contacts: ContactProps[];
     };
+    const [contactIdToDelete, setContactIdToDelete] = useState<number | null>(null);
 
     const columns: ColumnDef<ContactProps>[] = [
         {
@@ -84,11 +87,7 @@ export default function Index() {
                         type="button"
                         className="rounded-md border border-red-200 p-2 text-red-600 transition hover:bg-red-50"
                         onClick={() => {
-                            if (!confirm('Delete this contact?')) {
-                                return;
-                            }
-
-                            router.delete(route('contact.destroy', row.original.id));
+                            setContactIdToDelete(row.original.id);
                         }}
                     >
                         <TrashIcon className="h-4 w-4" />
@@ -133,6 +132,20 @@ export default function Index() {
                         </div>
 
                         <DataTable<ContactProps> columns={columns} data={contacts} filterColumn="names" />
+                        <DeleteConfirmationDialog
+                            isOpen={contactIdToDelete !== null}
+                            title="Delete Contact"
+                            description="Are you sure you want to delete this contact? This action cannot be undone."
+                            onConfirm={() => {
+                                if (contactIdToDelete !== null) {
+                                    router.delete(route('contact.destroy', contactIdToDelete));
+                                }
+                                setContactIdToDelete(null);
+                            }}
+                            onCancel={() => {
+                                setContactIdToDelete(null);
+                            }}
+                        />
                     </div>
                 )}
             </div>

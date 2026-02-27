@@ -6,8 +6,10 @@ namespace App\Http\Controllers;
 
 use App\Actions\Survey\CreateSurvey;
 use App\Http\Requests\Survey\StoreSurveyRequest;
+use App\Http\Requests\Survey\UpdateSurveyQuestionRequest;
 use App\Models\Contact;
 use App\Models\ContactGroup;
+use App\Models\Question;
 use App\Models\Survey;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -60,25 +62,191 @@ class SurveyController extends Controller
             ->orderBy('name')
             ->get();
 
+        $existingTriggerWords = Survey::query()
+            ->pluck('trigger_word')
+            ->map(fn (string $triggerWord): string => mb_strtolower(trim($triggerWord)))
+            ->filter()
+            ->unique()
+            ->values();
+
         return Inertia::render('surveys/question/Create', [
             'contacts' => $contacts,
             'contactGroups' => $contactGroups,
+            'existingTriggerWords' => $existingTriggerWords,
         ]);
     }
 
     public function store(StoreSurveyRequest $request): RedirectResponse
     {
-        $this->createSurvey->handle($request->validated(), (int) $request->user()->id);
+        $validated = $request->validated();
+        $survey = $this->createSurvey->handle($validated, (int) $request->user()->id);
+
+        $requestedStatus = (string) ($validated['status'] ?? 'draft');
+        $message = 'Survey saved as draft successfully!';
+
+        if ($requestedStatus === 'active') {
+            $message = $survey->status === 'active'
+                ? 'Survey published successfully!'
+                : 'Survey scheduled successfully. It will become active on the start date.';
+        }
 
         return redirect()->route('questions.index')
-            ->with('success', 'Survey created successfully!');
+            ->with('success', $message);
     }
 
     public function show(Survey $survey): Response
     {
+        $survey = Survey::query()
+            ->whereKey($survey->id)
+            ->where('created_by', Auth::id())
+            ->with('questions.options')
+            ->withCount([
+                'contacts as sent_recipients_count' => function (Builder $query): void {
+                    $query->whereNotNull('contact_survey.sent_at');
+                },
+            ])
+            ->firstOrFail();
+
         return Inertia::render('surveys/question/Show', [
-            'survey' => $survey->load('questions.options'),
+            'survey' => $survey,
         ]);
+    }
+
+    public function updateQuestion(
+        UpdateSurveyQuestionRequest $request,
+        Survey $survey,
+        Question $question,
+    ): RedirectResponse {
+        $survey = Survey::query()
+            ->whereKey($survey->id)
+            ->where('created_by', Auth::id())
+            ->firstOrFail();
+
+        $question = $survey->questions()
+            ->whereKey($question->id)
+            ->firstOrFail();
+
+        $hasPublishedRecipients = $survey->contacts()
+            ->whereNotNull('contact_survey.sent_at')
+            ->exists();
+
+        if ($survey->status !== 'draft' || $hasPublishedRecipients) {
+            abort(403, 'Only unpublished draft surveys can be edited.');
+        }
+
+        $validated = $request->validated();
+        $responseType = (string) $validated['response_type'];
+
+        $question->update([
+            'question' => (string) $validated['question'],
+            'response_type' => $responseType,
+            'allow_multiple' => $responseType === 'multiple-choice'
+                ? (bool) ($validated['allow_multiple'] ?? false)
+                : false,
+            'free_text_description' => $responseType === 'free-text'
+                ? (string) ($validated['free_text_description'] ?? '')
+                : null,
+        ]);
+
+        $question->options()->delete();
+
+        if ($responseType === 'multiple-choice') {
+            $options = collect((array) ($validated['options'] ?? []))
+                ->pluck('option')
+                ->map(fn (mixed $value): string => trim((string) $value))
+                ->filter()
+                ->values();
+
+            foreach ($options as $index => $optionText) {
+                $question->options()->create([
+                    'option' => $optionText,
+                    'order' => $index,
+                    'branching' => null,
+                ]);
+            }
+        }
+
+        return redirect()
+            ->route('surveys.show', $survey)
+            ->with('success', 'Question updated successfully.');
+    }
+
+    public function destroy(Survey $survey): RedirectResponse
+    {
+        $survey = Survey::query()
+            ->whereKey($survey->id)
+            ->where('created_by', Auth::id())
+            ->firstOrFail();
+
+        $survey->delete();
+
+        return redirect()
+            ->route('questions.index')
+            ->with('success', 'Survey deleted successfully.');
+    }
+
+    public function cancel(Survey $survey): RedirectResponse
+    {
+        $survey = Survey::query()
+            ->whereKey($survey->id)
+            ->where('created_by', Auth::id())
+            ->firstOrFail();
+
+        if (in_array($survey->status, ['completed', 'cancelled'], true)) {
+            return redirect()
+                ->route('surveys.show', $survey)
+                ->with('error', 'This survey cannot be cancelled.');
+        }
+
+        $survey->update([
+            'status' => 'cancelled',
+        ]);
+
+        return redirect()
+            ->route('surveys.show', $survey)
+            ->with('success', 'Survey cancelled successfully.');
+    }
+
+    public function reactivate(Survey $survey): RedirectResponse
+    {
+        $survey = Survey::query()
+            ->whereKey($survey->id)
+            ->where('created_by', Auth::id())
+            ->firstOrFail();
+
+        if ($survey->status !== 'cancelled') {
+            return redirect()
+                ->route('surveys.show', $survey)
+                ->with('error', 'Only cancelled surveys can be reactivated.');
+        }
+
+        $hasPublishedRecipients = $survey->contacts()
+            ->whereNotNull('contact_survey.sent_at')
+            ->exists();
+
+        if (! $hasPublishedRecipients) {
+            $status = 'draft';
+        } else {
+            $today = now()->toDateString();
+            $startDate = $survey->start_date?->toDateString();
+            $endDate = $survey->end_date?->toDateString();
+
+            if ($startDate !== null && $today < $startDate) {
+                $status = 'draft';
+            } elseif ($endDate !== null && $today > $endDate) {
+                $status = 'completed';
+            } else {
+                $status = 'active';
+            }
+        }
+
+        $survey->update([
+            'status' => $status,
+        ]);
+
+        return redirect()
+            ->route('surveys.show', $survey)
+            ->with('success', 'Survey reactivated successfully.');
     }
 
     public function responsesIndex(): Response

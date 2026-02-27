@@ -1,6 +1,6 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
-import { PencilIcon, Search, TrashIcon } from 'lucide-react';
+import { Search } from 'lucide-react';
 import NotFound from '@/components/NotFound';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
@@ -10,7 +10,7 @@ import surveysRoutes from '@/routes/surveys';
 import type { BreadcrumbItem } from '@/types';
 
 
-export type SurveyStatus = 'draft' | 'scheduled' | 'active' | 'completed';
+export type SurveyStatus = 'draft' | 'scheduled' | 'active' | 'completed' | 'cancelled';
 
 export interface BranchingCondition {
     answer: string | number;
@@ -75,6 +75,7 @@ export default function Index() {
         scheduled: 'bg-amber-100 text-amber-700 border border-amber-200',
         active: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
         completed: 'bg-blue-100 text-blue-700 border border-blue-200',
+        cancelled: 'bg-rose-100 text-rose-700 border border-rose-300',
     };
 
     const cleanPaginationLabel = (label: string): string => {

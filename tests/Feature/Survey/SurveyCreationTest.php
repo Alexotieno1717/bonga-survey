@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Contact;
 use App\Models\Survey;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -19,6 +20,7 @@ test('authenticated user can create a survey with questions, options and recipie
     $response = $this
         ->actingAs($user)
         ->post(route('questions.store'), [
+            'status' => 'active',
             'surveyName' => 'Customer Satisfaction Survey',
             'description' => 'Quarterly customer feedback survey',
             'startDate' => '2026-02-24',
@@ -55,6 +57,7 @@ test('authenticated user can create a survey with questions, options and recipie
         return;
     }
 
+    expect($survey->status)->toBe('active');
     expect($survey->questions)->toHaveCount(2);
     expect($survey->questions()->first()->options)->toHaveCount(2);
 
@@ -65,6 +68,48 @@ test('authenticated user can create a survey with questions, options and recipie
             'sent_at' => '2026-02-25 10:00:00',
         ]);
     }
+});
+
+test('authenticated user can save survey as draft without recipients or schedule', function (): void {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
+
+    $user = User::factory()->create();
+
+    $response = $this
+        ->actingAs($user)
+        ->post(route('questions.store'), [
+            'status' => 'draft',
+            'surveyName' => 'Draft Survey',
+            'description' => 'Draft only',
+            'startDate' => '2026-02-24',
+            'endDate' => '2026-03-24',
+            'triggerWord' => 'DRAFT2026',
+            'completionMessage' => null,
+            'invitationMessage' => null,
+            'scheduleTime' => null,
+            'questions' => [
+                [
+                    'question' => 'Draft question',
+                    'responseType' => 'free-text',
+                    'allowMultiple' => false,
+                    'branching' => -1,
+                ],
+            ],
+            'recipients' => [],
+        ]);
+
+    $response->assertRedirect(route('questions.index'));
+
+    $survey = Survey::query()->where('trigger_word', 'DRAFT2026')->first();
+
+    expect($survey)->not->toBeNull();
+    if ($survey === null) {
+        return;
+    }
+
+    expect($survey->status)->toBe('draft');
+    expect($survey->questions()->count())->toBe(1);
+    expect($survey->contacts()->count())->toBe(0);
 });
 
 test('user cannot create a survey using recipients from another account', function (): void {
@@ -235,4 +280,291 @@ test('survey responses index is scoped and paginated for authenticated user', fu
             ->has('surveys.data', 10)
             ->where('surveys.total', 11)
         );
+});
+
+test('survey owner can edit a question from survey details page', function (): void {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
+
+    $owner = User::factory()->create();
+    $survey = Survey::query()->create([
+        'name' => 'Survey To Edit Question',
+        'description' => 'Original description',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDays(7)->toDateString(),
+        'trigger_word' => 'EDIT-QUESTION',
+        'completion_message' => null,
+        'invitation_message' => 'Reply START',
+        'scheduled_time' => now()->addDay(),
+        'status' => 'draft',
+        'created_by' => $owner->id,
+    ]);
+
+    $question = $survey->questions()->create([
+        'question' => 'Old question text',
+        'response_type' => 'multiple-choice',
+        'free_text_description' => null,
+        'allow_multiple' => false,
+        'order' => 0,
+        'branching' => null,
+    ]);
+
+    $question->options()->createMany([
+        ['option' => 'Option A', 'order' => 0],
+        ['option' => 'Option B', 'order' => 1],
+    ]);
+
+    $response = $this->actingAs($owner)->put(route('surveys.questions.update', [$survey, $question]), [
+        'question' => 'Updated question text',
+        'response_type' => 'multiple-choice',
+        'allow_multiple' => true,
+        'options' => [
+            ['option' => 'New Option 1'],
+            ['option' => 'New Option 2'],
+            ['option' => 'New Option 3'],
+        ],
+    ]);
+
+    $response->assertRedirect(route('surveys.show', $survey));
+
+    $question->refresh();
+
+    expect($question->question)->toBe('Updated question text');
+    expect($question->allow_multiple)->toBeTruthy();
+    expect($question->options()->count())->toBe(3);
+    expect($question->options()->pluck('option')->all())->toBe([
+        'New Option 1',
+        'New Option 2',
+        'New Option 3',
+    ]);
+});
+
+test('survey owner can delete survey from survey details page', function (): void {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
+
+    $owner = User::factory()->create();
+    $survey = Survey::query()->create([
+        'name' => 'Survey To Delete',
+        'description' => 'Will be deleted',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDays(7)->toDateString(),
+        'trigger_word' => 'DELETE-SURVEY',
+        'completion_message' => null,
+        'invitation_message' => 'Reply START',
+        'scheduled_time' => now()->addDay(),
+        'status' => 'draft',
+        'created_by' => $owner->id,
+    ]);
+
+    $question = $survey->questions()->create([
+        'question' => 'Question tied to deleted survey',
+        'response_type' => 'free-text',
+        'free_text_description' => 'Details',
+        'allow_multiple' => false,
+        'order' => 0,
+        'branching' => null,
+    ]);
+
+    $response = $this->actingAs($owner)->delete(route('surveys.destroy', $survey));
+
+    $response->assertRedirect(route('questions.index'));
+
+    $this->assertDatabaseMissing('surveys', ['id' => $survey->id]);
+    $this->assertDatabaseMissing('questions', ['id' => $question->id]);
+});
+
+test('non owner cannot edit or delete another users survey', function (): void {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
+
+    $owner = User::factory()->create();
+    $otherUser = User::factory()->create();
+
+    $survey = Survey::query()->create([
+        'name' => 'Protected Survey',
+        'description' => 'Should be protected',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDays(7)->toDateString(),
+        'trigger_word' => 'PROTECTED-SURVEY',
+        'completion_message' => null,
+        'invitation_message' => 'Reply START',
+        'scheduled_time' => now()->addDay(),
+        'status' => 'draft',
+        'created_by' => $owner->id,
+    ]);
+
+    $question = $survey->questions()->create([
+        'question' => 'Protected question',
+        'response_type' => 'free-text',
+        'free_text_description' => 'Original',
+        'allow_multiple' => false,
+        'order' => 0,
+        'branching' => null,
+    ]);
+
+    $editResponse = $this->actingAs($otherUser)->put(route('surveys.questions.update', [$survey, $question]), [
+        'question' => 'Attempted update',
+        'response_type' => 'free-text',
+        'free_text_description' => 'Attempted description',
+    ]);
+
+    $editResponse->assertNotFound();
+
+    $deleteResponse = $this->actingAs($otherUser)->delete(route('surveys.destroy', $survey));
+    $deleteResponse->assertNotFound();
+
+    $question->refresh();
+    expect($question->question)->toBe('Protected question');
+    $this->assertDatabaseHas('surveys', ['id' => $survey->id]);
+});
+
+test('published surveys cannot have questions edited', function (): void {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
+
+    $owner = User::factory()->create();
+
+    $survey = Survey::query()->create([
+        'name' => 'Published Survey',
+        'description' => 'Published and locked',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDays(7)->toDateString(),
+        'trigger_word' => 'PUBLISHED-LOCKED',
+        'completion_message' => null,
+        'invitation_message' => 'Reply START',
+        'scheduled_time' => now()->addDay(),
+        'status' => 'active',
+        'created_by' => $owner->id,
+    ]);
+
+    $question = $survey->questions()->create([
+        'question' => 'Original published question',
+        'response_type' => 'free-text',
+        'free_text_description' => 'Original description',
+        'allow_multiple' => false,
+        'order' => 0,
+        'branching' => null,
+    ]);
+
+    $response = $this->actingAs($owner)->put(route('surveys.questions.update', [$survey, $question]), [
+        'question' => 'Attempted update',
+        'response_type' => 'free-text',
+        'free_text_description' => 'Attempted description',
+    ]);
+
+    $response->assertForbidden();
+    expect($question->refresh()->question)->toBe('Original published question');
+});
+
+test('scheduled published survey stays draft until start date then becomes active and later completed', function (): void {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
+
+    $user = User::factory()->create();
+    $contact = Contact::factory()->create([
+        'user_id' => $user->id,
+    ]);
+
+    Carbon::setTestNow('2026-02-27 09:00:00');
+
+    $response = $this
+        ->actingAs($user)
+        ->post(route('questions.store'), [
+            'status' => 'active',
+            'surveyName' => 'Scheduled Survey',
+            'description' => 'Should activate on start date',
+            'startDate' => '2026-03-01',
+            'endDate' => '2026-03-03',
+            'triggerWord' => 'SCHEDULED-TRACK',
+            'completionMessage' => null,
+            'invitationMessage' => 'Reply START',
+            'scheduleTime' => '2026-03-01 10:00:00',
+            'questions' => [
+                [
+                    'question' => 'Scheduled question',
+                    'responseType' => 'free-text',
+                    'allowMultiple' => false,
+                    'branching' => -1,
+                ],
+            ],
+            'recipients' => [
+                ['id' => $contact->id],
+            ],
+        ]);
+
+    $response->assertRedirect(route('questions.index'));
+
+    $survey = Survey::query()->where('trigger_word', 'SCHEDULED-TRACK')->firstOrFail();
+    expect($survey->status)->toBe('draft');
+    expect($survey->contacts()->whereNotNull('contact_survey.sent_at')->count())->toBe(1);
+
+    $question = $survey->questions()->firstOrFail();
+    $lockedEditResponse = $this->actingAs($user)->put(route('surveys.questions.update', [$survey, $question]), [
+        'question' => 'Attempted update while scheduled',
+        'response_type' => 'free-text',
+        'free_text_description' => 'Attempted',
+    ]);
+    $lockedEditResponse->assertForbidden();
+
+    Carbon::setTestNow('2026-03-01 12:00:00');
+    $this->artisan('surveys:sync-statuses')->assertSuccessful();
+    expect($survey->fresh()?->status)->toBe('active');
+
+    Carbon::setTestNow('2026-03-04 00:01:00');
+    $this->artisan('surveys:sync-statuses')->assertSuccessful();
+    expect($survey->fresh()?->status)->toBe('completed');
+
+    Carbon::setTestNow();
+});
+
+test('owner can cancel survey and cancelled survey is not transitioned by sync command', function (): void {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
+
+    $owner = User::factory()->create();
+    $survey = Survey::query()->create([
+        'name' => 'Cancelable Survey',
+        'description' => 'Can be cancelled',
+        'start_date' => now()->subDay()->toDateString(),
+        'end_date' => now()->addDays(2)->toDateString(),
+        'trigger_word' => 'CANCEL-TRACK',
+        'completion_message' => null,
+        'invitation_message' => 'Reply START',
+        'scheduled_time' => now(),
+        'status' => 'active',
+        'created_by' => $owner->id,
+    ]);
+
+    $cancelResponse = $this->actingAs($owner)->patch(route('surveys.cancel', $survey));
+    $cancelResponse->assertRedirect(route('surveys.show', $survey));
+    expect($survey->fresh()?->status)->toBe('cancelled');
+
+    $this->artisan('surveys:sync-statuses')->assertSuccessful();
+    expect($survey->fresh()?->status)->toBe('cancelled');
+});
+
+test('owner can reactivate cancelled survey', function (): void {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
+
+    $owner = User::factory()->create();
+    $contact = Contact::factory()->create([
+        'user_id' => $owner->id,
+    ]);
+
+    $survey = Survey::query()->create([
+        'name' => 'Reactivatable Survey',
+        'description' => 'Can be reactivated',
+        'start_date' => now()->subDay()->toDateString(),
+        'end_date' => now()->addDays(2)->toDateString(),
+        'trigger_word' => 'REACTIVATE-TRACK',
+        'completion_message' => null,
+        'invitation_message' => 'Reply START',
+        'scheduled_time' => now(),
+        'status' => 'cancelled',
+        'created_by' => $owner->id,
+    ]);
+
+    $survey->contacts()->attach($contact->id, [
+        'sent_at' => now(),
+    ]);
+
+    $response = $this->actingAs($owner)->patch(route('surveys.reactivate', $survey));
+
+    $response->assertRedirect(route('surveys.show', $survey));
+    expect($survey->fresh()?->status)->toBe('active');
 });

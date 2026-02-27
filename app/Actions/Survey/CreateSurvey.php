@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Survey;
 
 use App\Models\Survey;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 class CreateSurvey
@@ -14,8 +15,22 @@ class CreateSurvey
      */
     public function handle(array $validated, int $userId): Survey
     {
+        $requestedStatus = (string) ($validated['status'] ?? 'draft');
+        $startDate = CarbonImmutable::parse((string) $validated['startDate'])->startOfDay();
+        $endDate = CarbonImmutable::parse((string) $validated['endDate'])->endOfDay();
+        $now = now();
+
+        $status = 'draft';
+        if ($requestedStatus === 'active') {
+            if ($now->between($startDate, $endDate, true)) {
+                $status = 'active';
+            } elseif ($now->greaterThan($endDate)) {
+                $status = 'completed';
+            }
+        }
+
         /** @var Survey $survey */
-        $survey = DB::transaction(function () use ($validated, $userId): Survey {
+        $survey = DB::transaction(function () use ($validated, $userId, $status, $requestedStatus): Survey {
             $survey = Survey::query()->create([
                 'name' => $validated['surveyName'],
                 'description' => $validated['description'],
@@ -25,7 +40,7 @@ class CreateSurvey
                 'completion_message' => $validated['completionMessage'] ?? null,
                 'invitation_message' => $validated['invitationMessage'],
                 'scheduled_time' => $validated['scheduleTime'],
-                'status' => 'draft',
+                'status' => $status,
                 'created_by' => $userId,
             ]);
 
@@ -57,12 +72,12 @@ class CreateSurvey
                 }
             }
 
-            $contactIds = collect($validated['recipients'])->pluck('id')->toArray();
+            $contactIds = collect($validated['recipients'] ?? [])->pluck('id')->toArray();
 
             $pivotData = [];
             foreach ($contactIds as $contactId) {
                 $pivotData[$contactId] = [
-                    'sent_at' => $validated['scheduleTime'],
+                    'sent_at' => $requestedStatus === 'active' ? $validated['scheduleTime'] : null,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];

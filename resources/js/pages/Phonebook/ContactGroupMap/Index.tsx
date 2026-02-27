@@ -1,8 +1,10 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { PencilIcon, TrashIcon } from 'lucide-react';
+import { useState } from 'react';
 import { route } from 'ziggy-js';
 import { DataTable } from '@/components/DataTable';
+import DeleteConfirmationDialog from '@/components/DeleteConfirmationDialog';
 import NotFound from '@/components/NotFound';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -37,6 +39,7 @@ export default function Index() {
     const { contactgroupmaps } = usePage().props as unknown as {
         contactgroupmaps: ContactGroupMapProps[];
     };
+    const [contactGroupMapIdToDelete, setContactGroupMapIdToDelete] = useState<number | null>(null);
 
     const columns: ColumnDef<ContactGroupMapProps>[] = [
         {
@@ -96,11 +99,7 @@ export default function Index() {
                         type="button"
                         className="rounded-md border border-red-200 p-2 text-red-600 transition hover:bg-red-50"
                         onClick={() => {
-                            if (!confirm('Delete this contact group map?')) {
-                                return;
-                            }
-
-                            router.delete(route('contactgroupmaps.destroy', row.original.id));
+                            setContactGroupMapIdToDelete(row.original.id);
                         }}
                     >
                         <TrashIcon className="h-4 w-4" />
@@ -137,6 +136,20 @@ export default function Index() {
                         <div className="py-2">
                             <DataTable<ContactGroupMapProps> columns={columns} data={contactgroupmaps} filterColumn="group" />
                         </div>
+                        <DeleteConfirmationDialog
+                            isOpen={contactGroupMapIdToDelete !== null}
+                            title="Delete Contact Group Map"
+                            description="Are you sure you want to delete this contact group map? This action cannot be undone."
+                            onConfirm={() => {
+                                if (contactGroupMapIdToDelete !== null) {
+                                    router.delete(route('contactgroupmaps.destroy', contactGroupMapIdToDelete));
+                                }
+                                setContactGroupMapIdToDelete(null);
+                            }}
+                            onCancel={() => {
+                                setContactGroupMapIdToDelete(null);
+                            }}
+                        />
                     </>
 
                 )}

@@ -1,4 +1,4 @@
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
 import {
     CalendarDays,
@@ -9,10 +9,17 @@ import {
     MessageSquareText,
     Milestone,
     MoveLeft,
+    Pencil,
+    Plus,
+    Save,
+    Trash2,
+    X,
 } from 'lucide-react';
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import DeleteConfirmationDialog from '@/components/DeleteConfirmationDialog';
 import AppLayout from '@/layouts/app-layout';
 import questions from '@/routes/questions';
 import surveysRoutes from '@/routes/surveys';
@@ -50,7 +57,16 @@ interface SurveyDetails {
     scheduled_time: string | null;
     status: SurveyStatus;
     created_at: string;
+    sent_recipients_count: number;
     questions: SurveyQuestion[];
+}
+
+interface QuestionEditState {
+    question: string;
+    response_type: 'free-text' | 'multiple-choice';
+    free_text_description: string;
+    allow_multiple: boolean;
+    options: string[];
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -104,8 +120,77 @@ function formatBranching(branching: unknown): string {
     return `Next: ${String(branching)}`;
 }
 
+function buildEditState(question: SurveyQuestion): QuestionEditState {
+    return {
+        question: question.question,
+        response_type: question.response_type,
+        free_text_description: question.free_text_description ?? '',
+        allow_multiple: question.allow_multiple,
+        options: [...question.options]
+            .sort((a, b) => a.order - b.order)
+            .map((option) => option.option ?? ''),
+    };
+}
+
 export default function Show() {
     const { survey } = usePage().props as unknown as { survey: SurveyDetails };
+    const canEditSurvey = survey.status === 'draft' && survey.sent_recipients_count === 0;
+    const [editingQuestionId, setEditingQuestionId] = useState<number | null>(null);
+    const [questionEditState, setQuestionEditState] = useState<QuestionEditState | null>(null);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+    const beginQuestionEdit = (question: SurveyQuestion): void => {
+        setEditingQuestionId(question.id);
+        setQuestionEditState(buildEditState(question));
+    };
+
+    const cancelQuestionEdit = (): void => {
+        setEditingQuestionId(null);
+        setQuestionEditState(null);
+    };
+
+    const saveQuestionEdit = (questionId: number): void => {
+        if (!questionEditState || !canEditSurvey) {
+            return;
+        }
+
+        router.put(
+            surveysRoutes.questions.update([survey.id, questionId]).url,
+            {
+                question: questionEditState.question,
+                response_type: questionEditState.response_type,
+                free_text_description: questionEditState.free_text_description,
+                allow_multiple: questionEditState.allow_multiple,
+                options: questionEditState.options.map((option) => ({ option })),
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    cancelQuestionEdit();
+                },
+            },
+        );
+    };
+
+    const deleteSurvey = (): void => {
+        setIsDeleteDialogOpen(true);
+    };
+
+    const cancelSurvey = (): void => {
+        if (!window.confirm('Cancel this survey? You can no longer continue publishing it.')) {
+            return;
+        }
+
+        router.patch(surveysRoutes.cancel(survey.id).url);
+    };
+
+    const reactivateSurvey = (): void => {
+        if (!window.confirm('Reactivate this survey?')) {
+            return;
+        }
+
+        router.patch(surveysRoutes.reactivate(survey.id).url);
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -133,6 +218,35 @@ export default function Show() {
                                         View Responses
                                     </Button>
                                 </Link>
+                                <Button
+                                    type="button"
+                                    variant="destructive"
+                                    className="bg-red-500/80 text-white hover:bg-red-500"
+                                    onClick={deleteSurvey}
+                                >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete Survey
+                                </Button>
+                                {(survey.status === 'draft' || survey.status === 'active') ? (
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        className="bg-amber-500/80 text-white hover:bg-amber-500"
+                                        onClick={cancelSurvey}
+                                    >
+                                        Cancel Survey
+                                    </Button>
+                                ) : null}
+                                {survey.status === 'cancelled' ? (
+                                    <Button
+                                        type="button"
+                                        variant="secondary"
+                                        className="bg-emerald-500/80 text-white hover:bg-emerald-500"
+                                        onClick={reactivateSurvey}
+                                    >
+                                        Reactivate Survey
+                                    </Button>
+                                ) : null}
                             </div>
 
                             <Badge
@@ -266,75 +380,240 @@ export default function Show() {
                         ) : (
                             [...survey.questions]
                                 .sort((a, b) => a.order - b.order)
-                                .map((question, index) => (
-                                    <div
-                                        key={question.id}
-                                        className="rounded-xl border bg-muted/20 p-4"
-                                    >
-                                        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                                            <div className="space-y-2">
-                                                <p className="text-sm font-medium text-muted-foreground">
-                                                    Question {index + 1}
-                                                </p>
-                                                <h3 className="text-base font-semibold">
-                                                    {question.question}
-                                                </h3>
-                                            </div>
+                                .map((question, index) => {
+                                    const isEditingCurrent = editingQuestionId === question.id && questionEditState !== null;
 
-                                            <div className="flex items-center gap-2">
-                                                <Badge variant="outline" className="capitalize">
-                                                    {question.response_type}
-                                                </Badge>
-                                                {question.allow_multiple ? (
-                                                    <Badge variant="secondary">
-                                                        Multi-select
-                                                    </Badge>
-                                                ) : null}
-                                            </div>
-                                        </div>
-
-                                        {question.response_type === 'multiple-choice' ? (
-                                            <div className="space-y-2">
-                                                {question.options.length > 0 ? (
-                                                    [...question.options]
-                                                        .sort((a, b) => a.order - b.order)
-                                                        .map((option, optionIndex) => (
-                                                            <div
-                                                                key={option.id}
-                                                                className="flex items-center justify-between rounded-md border bg-white px-3 py-2"
-                                                            >
-                                                                <span className="text-sm">
-                                                                    {optionIndex + 1}. {option.option}
-                                                                </span>
-                                                                <Badge variant="outline">
-                                                                    {formatBranching(option.branching)}
-                                                                </Badge>
-                                                            </div>
-                                                        ))
-                                                ) : (
-                                                    <p className="text-sm text-muted-foreground">
-                                                        No options configured.
+                                    return (
+                                        <div
+                                            key={question.id}
+                                            className="rounded-xl border bg-muted/20 p-4"
+                                        >
+                                            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                                                <div className="space-y-2">
+                                                    <p className="text-sm font-medium text-muted-foreground">
+                                                        Question {index + 1}
                                                     </p>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <div className="rounded-md border bg-white px-3 py-2 text-sm text-muted-foreground">
-                                                {question.free_text_description ||
-                                                    'Participant will provide an open-ended text response.'}
-                                            </div>
-                                        )}
+                                                    {isEditingCurrent ? (
+                                                        <input
+                                                            type="text"
+                                                            className="w-full rounded-md border bg-white px-3 py-2 text-sm"
+                                                            value={questionEditState.question}
+                                                            onChange={(event) => {
+                                                                setQuestionEditState({
+                                                                    ...questionEditState,
+                                                                    question: event.target.value,
+                                                                });
+                                                            }}
+                                                        />
+                                                    ) : (
+                                                        <h3 className="text-base font-semibold">
+                                                            {question.question}
+                                                        </h3>
+                                                    )}
+                                                </div>
 
-                                        <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                                            <CircleDotDashed className="h-3.5 w-3.5" />
-                                            <span>
-                                                Branching: {formatBranching(question.branching)}
-                                            </span>
+                                                <div className="flex items-center gap-2">
+                                                    {isEditingCurrent ? (
+                                                        <>
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={cancelQuestionEdit}
+                                                            >
+                                                                <X className="mr-2 h-4 w-4" />
+                                                                Cancel
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                onClick={() => {
+                                                                    saveQuestionEdit(question.id);
+                                                                }}
+                                                            >
+                                                                <Save className="mr-2 h-4 w-4" />
+                                                                Save
+                                                            </Button>
+                                                        </>
+                                                    ) : canEditSurvey ? (
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                beginQuestionEdit(question);
+                                                            }}
+                                                        >
+                                                            <Pencil className="mr-2 h-4 w-4" />
+                                                            Edit
+                                                        </Button>
+                                                    ) : (
+                                                        <Badge variant="outline">Locked</Badge>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {isEditingCurrent ? (
+                                                <div className="space-y-3">
+                                                    <div className="flex flex-wrap items-center gap-3">
+                                                        <label className="text-sm font-medium text-muted-foreground">
+                                                            Response Type
+                                                        </label>
+                                                        <select
+                                                            className="rounded-md border bg-white px-3 py-2 text-sm"
+                                                            value={questionEditState.response_type}
+                                                            onChange={(event) => {
+                                                                const nextType = event.target.value as 'free-text' | 'multiple-choice';
+
+                                                                setQuestionEditState({
+                                                                    ...questionEditState,
+                                                                    response_type: nextType,
+                                                                    allow_multiple: nextType === 'multiple-choice'
+                                                                        ? questionEditState.allow_multiple
+                                                                        : false,
+                                                                });
+                                                            }}
+                                                        >
+                                                            <option value="free-text">free-text</option>
+                                                            <option value="multiple-choice">multiple-choice</option>
+                                                        </select>
+
+                                                        {questionEditState.response_type === 'multiple-choice' ? (
+                                                            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={questionEditState.allow_multiple}
+                                                                    onChange={(event) => {
+                                                                        setQuestionEditState({
+                                                                            ...questionEditState,
+                                                                            allow_multiple: event.target.checked,
+                                                                        });
+                                                                    }}
+                                                                />
+                                                                Multi-select
+                                                            </label>
+                                                        ) : null}
+                                                    </div>
+
+                                                    {questionEditState.response_type === 'multiple-choice' ? (
+                                                        <div className="space-y-2">
+                                                            {questionEditState.options.map((option, optionIndex) => (
+                                                                <div key={optionIndex} className="flex items-center gap-2">
+                                                                    <input
+                                                                        type="text"
+                                                                        className="w-full rounded-md border bg-white px-3 py-2 text-sm"
+                                                                        value={option}
+                                                                        onChange={(event) => {
+                                                                            const nextOptions = [...questionEditState.options];
+                                                                            nextOptions[optionIndex] = event.target.value;
+
+                                                                            setQuestionEditState({
+                                                                                ...questionEditState,
+                                                                                options: nextOptions,
+                                                                            });
+                                                                        }}
+                                                                    />
+                                                                    <Button
+                                                                        type="button"
+                                                                        size="icon"
+                                                                        variant="outline"
+                                                                        onClick={() => {
+                                                                            setQuestionEditState({
+                                                                                ...questionEditState,
+                                                                                options: questionEditState.options.filter((_, indexToKeep) => indexToKeep !== optionIndex),
+                                                                            });
+                                                                        }}
+                                                                    >
+                                                                        <Trash2 className="h-4 w-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            ))}
+
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => {
+                                                                    setQuestionEditState({
+                                                                        ...questionEditState,
+                                                                        options: [...questionEditState.options, ''],
+                                                                    });
+                                                                }}
+                                                            >
+                                                                <Plus className="mr-2 h-4 w-4" />
+                                                                Add Option
+                                                            </Button>
+                                                        </div>
+                                                    ) : (
+                                                        <textarea
+                                                            rows={3}
+                                                            className="w-full rounded-md border bg-white px-3 py-2 text-sm"
+                                                            value={questionEditState.free_text_description}
+                                                            onChange={(event) => {
+                                                                setQuestionEditState({
+                                                                    ...questionEditState,
+                                                                    free_text_description: event.target.value,
+                                                                });
+                                                            }}
+                                                            placeholder="Participant will provide an open-ended text response."
+                                                        />
+                                                    )}
+                                                </div>
+                                            ) : question.response_type === 'multiple-choice' ? (
+                                                <div className="space-y-2">
+                                                    {question.options.length > 0 ? (
+                                                        [...question.options]
+                                                            .sort((a, b) => a.order - b.order)
+                                                            .map((option, optionIndex) => (
+                                                                <div
+                                                                    key={option.id}
+                                                                    className="flex items-center justify-between rounded-md border bg-white px-3 py-2"
+                                                                >
+                                                                    <span className="text-sm">
+                                                                        {optionIndex + 1}. {option.option}
+                                                                    </span>
+                                                                    <Badge variant="outline">
+                                                                        {formatBranching(option.branching)}
+                                                                    </Badge>
+                                                                </div>
+                                                            ))
+                                                    ) : (
+                                                        <p className="text-sm text-muted-foreground">
+                                                            No options configured.
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <div className="rounded-md border bg-white px-3 py-2 text-sm text-muted-foreground">
+                                                    {question.free_text_description ||
+                                                        'Participant will provide an open-ended text response.'}
+                                                </div>
+                                            )}
+
+                                            <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                                                <CircleDotDashed className="h-3.5 w-3.5" />
+                                                <span>
+                                                    Branching: {formatBranching(question.branching)}
+                                                </span>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))
+                                    );
+                                })
                         )}
                     </CardContent>
                 </Card>
+                <DeleteConfirmationDialog
+                    isOpen={isDeleteDialogOpen}
+                    title="Delete Survey"
+                    description="Are you sure you want to delete this survey? This action cannot be undone."
+                    onConfirm={() => {
+                        router.delete(surveysRoutes.destroy(survey.id).url);
+                        setIsDeleteDialogOpen(false);
+                    }}
+                    onCancel={() => {
+                        setIsDeleteDialogOpen(false);
+                    }}
+                />
             </div>
         </AppLayout>
     );
