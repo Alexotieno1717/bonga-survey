@@ -4,7 +4,6 @@ import { Search } from 'lucide-react';
 import NotFound from '@/components/NotFound';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
-import contact from '@/routes/contact';
 import questions from '@/routes/questions';
 import surveysRoutes from '@/routes/surveys';
 import type { BreadcrumbItem } from '@/types';
@@ -94,8 +93,8 @@ export default function Index() {
                     {surveys.data.length === 0 ? (
                         <div className="absolute inset-0 flex items-center justify-center">
                             <NotFound
-                                title="contact"
-                                pathToCreate={contact.create().url}
+                                title="Survey"
+                                pathToCreate={questions.create().url}
                             />
                         </div>
                     ) : (
