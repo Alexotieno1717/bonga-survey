@@ -16,10 +16,10 @@ import {
     X,
 } from 'lucide-react';
 import { useState } from 'react';
+import DeleteConfirmationDialog from '@/components/DeleteConfirmationDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import DeleteConfirmationDialog from '@/components/DeleteConfirmationDialog';
 import AppLayout from '@/layouts/app-layout';
 import questions from '@/routes/questions';
 import surveysRoutes from '@/routes/surveys';
