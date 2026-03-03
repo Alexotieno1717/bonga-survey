@@ -140,9 +140,7 @@ class SurveyController extends Controller
         $question->update([
             'question' => (string) $validated['question'],
             'response_type' => $responseType,
-            'allow_multiple' => $responseType === 'multiple-choice'
-                ? (bool) ($validated['allow_multiple'] ?? false)
-                : false,
+            'allow_multiple' => $responseType === 'multiple-choice' && (bool) ($validated['allow_multiple'] ?? false),
             'free_text_description' => $responseType === 'free-text'
                 ? (string) ($validated['free_text_description'] ?? '')
                 : null,

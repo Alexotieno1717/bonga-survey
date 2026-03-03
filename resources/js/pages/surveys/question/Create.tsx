@@ -20,14 +20,18 @@ import {
     EditIcon,
     MoveLeft,
     MoveRight,
+    RotateCcw,
+    SendHorizontal,
     Trash2,
     TriangleAlert,
     UserPlus,
 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import * as Yup from 'yup';
 import AddContactsModal from '@/components/AddContactsModal';
+import ChildQuestionsModal from '@/components/ChildQuestionsModal';
+import type { ChildQuestionOptionState } from '@/components/ChildQuestionsModal';
 import { DataTable } from '@/components/DataTable';
 import DatePicker from '@/components/DatePicker';
 import DeleteConfirmationDialog from '@/components/DeleteConfirmationDialog';
@@ -42,6 +46,7 @@ interface Question {
     question: string;
     responseType: 'free-text' | 'multiple-choice';
     options: string[];
+    optionSaveStates?: boolean[];
     allowMultiple?: boolean;
     freeTextDescription?: string;
     isSaved?: boolean;
@@ -95,6 +100,180 @@ const getCurrentDateTimeLocalValue = (): string => {
     return localDateTime.toISOString().slice(0, 16);
 };
 
+const buildSimulatorQuestionText = (question: Question): string => {
+    const questionText = question.question.trim();
+
+    if (question.responseType !== 'multiple-choice') {
+        return questionText;
+    }
+
+    const options = question.options
+        .map((option) => option.trim())
+        .filter((option) => option.length > 0);
+
+    if (options.length === 0) {
+        return questionText;
+    }
+
+    const optionLines = options
+        .map((option, index) => `${index + 1}. ${option}`)
+        .join('\n');
+
+    return `${questionText}\n${optionLines}`;
+};
+
+const parseMultipleChoiceReply = (reply: string, options: string[]): number | null => {
+    const normalizedReply = reply.trim().toLowerCase();
+
+    if (normalizedReply.length === 0) {
+        return null;
+    }
+
+    const numericReply = Number(normalizedReply);
+    if (!Number.isNaN(numericReply) && numericReply >= 1 && numericReply <= options.length) {
+        return numericReply - 1;
+    }
+
+    const exactMatchIndex = options.findIndex(
+        (option) => option.trim().toLowerCase() === normalizedReply,
+    );
+
+    return exactMatchIndex === -1 ? null : exactMatchIndex;
+};
+
+const resolveNextSimulatorQuestionIndex = (
+    question: Question,
+    currentIndex: number,
+    totalQuestions: number,
+    optionIndex: number | null = null,
+): number => {
+    let configuredTarget: unknown = null;
+
+    if (
+        question.responseType === 'multiple-choice' &&
+        !question.allowMultiple &&
+        optionIndex !== null &&
+        Array.isArray(question.branching)
+    ) {
+        configuredTarget = question.branching[optionIndex] ?? null;
+    } else {
+        configuredTarget = question.branching;
+    }
+
+    const parsedTarget = Number(configuredTarget);
+    let nextIndex = currentIndex + 1;
+
+    if (configuredTarget !== null && configuredTarget !== undefined && configuredTarget !== '' && !Number.isNaN(parsedTarget)) {
+        if (parsedTarget < 0) {
+            return -1;
+        }
+
+        if (parsedTarget > 0) {
+            nextIndex = parsedTarget;
+        }
+    }
+
+    if (nextIndex < 0 || nextIndex >= totalQuestions) {
+        return -1;
+    }
+
+    return nextIndex;
+};
+
+const resolveNextParentQuestionIndexFromTarget = (
+    target: unknown,
+    currentIndex: number,
+    totalQuestions: number,
+): number => {
+    const parsedTarget = Number(target);
+    let nextIndex = currentIndex + 1;
+
+    if (target !== null && target !== undefined && target !== '' && !Number.isNaN(parsedTarget)) {
+        if (parsedTarget < 0) {
+            return -1;
+        }
+
+        if (parsedTarget > 0) {
+            nextIndex = parsedTarget;
+        }
+    }
+
+    if (nextIndex < 0 || nextIndex >= totalQuestions) {
+        return -1;
+    }
+
+    return nextIndex;
+};
+
+const isBranchingEndTarget = (target: unknown): boolean => {
+    if (target === null || target === undefined || target === '') {
+        return false;
+    }
+
+    const parsedTarget = Number(target);
+
+    return !Number.isNaN(parsedTarget) && parsedTarget < 0;
+};
+
+const buildSimulatorChildQuestionText = (childQuestion: ChildQuestionOptionState['childQuestions'][number]): string => {
+    const questionText = childQuestion.question.trim();
+
+    if (childQuestion.responseType !== 'multiple-choice') {
+        return questionText;
+    }
+
+    const options = (childQuestion.options ?? [])
+        .map((option) => option.trim())
+        .filter((option) => option.length > 0);
+
+    if (options.length === 0) {
+        return questionText;
+    }
+
+    const optionLines = options
+        .map((option, index) => `${index + 1}. ${option}`)
+        .join('\n');
+
+    return `${questionText}\n${optionLines}`;
+};
+
+const resolveNextChildQuestionIndex = (
+    childQuestion: ChildQuestionOptionState['childQuestions'][number],
+    currentChildQuestionIndex: number,
+    totalChildQuestions: number,
+    optionIndex: number | null = null,
+): number => {
+    let target: unknown = childQuestion.branching;
+
+    if (
+        childQuestion.responseType === 'multiple-choice' &&
+        !childQuestion.allowMultiple &&
+        optionIndex !== null &&
+        Array.isArray(childQuestion.optionBranching)
+    ) {
+        target = childQuestion.optionBranching[optionIndex] ?? childQuestion.branching;
+    }
+
+    const parsedTarget = Number(target);
+    let nextChildQuestionIndex = currentChildQuestionIndex + 1;
+
+    if (target !== null && target !== undefined && target !== '' && !Number.isNaN(parsedTarget)) {
+        if (parsedTarget < 0) {
+            return -1;
+        }
+
+        if (parsedTarget > 0) {
+            nextChildQuestionIndex = parsedTarget - 1;
+        }
+    }
+
+    if (nextChildQuestionIndex < 0 || nextChildQuestionIndex >= totalChildQuestions) {
+        return -1;
+    }
+
+    return nextChildQuestionIndex;
+};
+
 interface FormValues {
     submissionAction: 'draft' | 'active';
     isCompletionMessageSaved?: boolean;
@@ -103,6 +282,7 @@ interface FormValues {
     description: string;
     startDate: Date | null;
     endDate: Date | null;
+    shortCode: string;
     triggerWord: string;
     questions: Question[];
     completionMessage?: string;
@@ -114,18 +294,44 @@ interface FormValues {
     scheduleTime: string;
 }
 
+interface SimulatorMessage {
+    id: number;
+    sender: 'system' | 'user' | 'muted';
+    text: string;
+}
+
+interface SimulatorSession {
+    started: boolean;
+    activeNode:
+        | {
+            kind: 'parent';
+            questionIndex: number;
+        }
+        | {
+            kind: 'child';
+            parentQuestionIndex: number;
+            optionIndex: number;
+            childQuestionIndex: number;
+            followUpBranching: string | null;
+        }
+        | null;
+    messages: SimulatorMessage[];
+}
+
 const initialValues: FormValues = {
     submissionAction: 'active',
     surveyName: '',
     description: '',
     startDate: new Date(today),
     endDate: null,
+    shortCode: '20642',
     triggerWord: '',
     questions: [
         {
             question: '',
             responseType: 'free-text',
             options: [],
+            optionSaveStates: [],
             allowMultiple: false,
             freeTextDescription: '',
             isSaved: true,
@@ -149,6 +355,24 @@ export default function Create() {
     const [recipientInputMode, setRecipientInputMode] = useState<'contacts' | 'upload'>('contacts');
     const [uploadedRecipientFileName, setUploadedRecipientFileName] = useState('');
     const [isParsingRecipientsFile, setIsParsingRecipientsFile] = useState(false);
+    const [activeChildQuestionModal, setActiveChildQuestionModal] = useState<{
+        questionIndex: number;
+        optionIndex: number;
+    } | null>(null);
+    const [childQuestionStates, setChildQuestionStates] = useState<Record<string, ChildQuestionOptionState>>({});
+    const simulatorMessageCounter = useRef(2);
+    const [simulatorInput, setSimulatorInput] = useState('');
+    const [simulatorSession, setSimulatorSession] = useState<SimulatorSession>({
+        started: false,
+        activeNode: null,
+        messages: [
+            {
+                id: 1,
+                sender: 'muted',
+                text: 'Reply with START to participate.',
+            },
+        ],
+    });
 
     const [deleteConfirmation, setDeleteConfirmation] = useState<{
         isOpen: boolean;
@@ -177,6 +401,7 @@ export default function Create() {
         endDate: Yup.date()
             .min(Yup.ref("startDate"), "End Date must be after start date")
             .required("End date is required"),
+        shortCode: Yup.string().required('Short code is required'),
         triggerWord: Yup.string()
             .required("Trigger word is required")
             .test(
@@ -229,6 +454,7 @@ export default function Create() {
                         question: '',
                         responseType: 'free-text',
                         options: [],
+                        optionSaveStates: [],
                         allowMultiple: false,
                         freeTextDescription: '',
                         isSaved: true,
@@ -367,7 +593,7 @@ export default function Create() {
                             <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm md:px-6">
                                 <h1 className="text-lg font-semibold text-slate-900">Create Survey</h1>
                                 <p className="mt-1 text-sm text-slate-500">
-                                    Set survey details, timeline, and trigger word before adding questions.
+                                    Set survey details, timeline, shortcode, and trigger word before adding questions.
                                 </p>
                             </div>
 
@@ -486,36 +712,61 @@ export default function Create() {
                             </div>
 
                             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
-                                <div className="space-y-1.5">
-                                    <label className="block text-sm font-medium text-slate-700">Trigger Word</label>
-                                    <Field
-                                        type="text"
-                                        name="triggerWord"
-                                        placeholder="Enter trigger word"
-                                        cols={30}
-                                        rows={5}
-                                        className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                                        onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                                            const nextTriggerWord = event.target.value;
-                                            const previousDefaultMessage = buildDefaultInvitationMessage(values.triggerWord);
-                                            const nextDefaultMessage = buildDefaultInvitationMessage(nextTriggerWord);
-                                            const currentInvitationMessage = values.invitationMessage ?? '';
+                                <div className="space-y-5">
+                                    <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
+                                        <div className="space-y-1.5">
+                                            <label className="block text-sm font-medium text-slate-700">Short Code</label>
+                                            <Field
+                                                as="select"
+                                                name="shortCode"
+                                                className="h-11 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-slate-700 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+                                            >
+                                                <option value="20642">20642</option>
+                                            </Field>
+                                            {errors.shortCode && touched.shortCode ? (
+                                                <span id="shortCode" className="text-sm text-red-500">
+                                                    <ErrorMessage id="shortCode" name="shortCode" />
+                                                </span>
+                                            ) : null}
+                                        </div>
 
-                                            setFieldValue('triggerWord', nextTriggerWord);
+                                        <div className="space-y-1.5">
+                                            <label className="block text-sm font-medium text-slate-700">Trigger Word</label>
+                                            <Field
+                                                type="text"
+                                                name="triggerWord"
+                                                placeholder="Enter trigger word"
+                                                cols={30}
+                                                rows={5}
+                                                className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                                                onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                                                    const nextTriggerWord = event.target.value;
+                                                    const previousDefaultMessage = buildDefaultInvitationMessage(values.triggerWord);
+                                                    const nextDefaultMessage = buildDefaultInvitationMessage(nextTriggerWord);
+                                                    const currentInvitationMessage = values.invitationMessage ?? '';
 
-                                            if (
-                                                currentInvitationMessage.trim() === '' ||
-                                                currentInvitationMessage === previousDefaultMessage
-                                            ) {
-                                                setFieldValue('invitationMessage', nextDefaultMessage);
-                                            }
-                                        }}
-                                    />
-                                    {errors.triggerWord && touched.triggerWord ? (
-                                        <span id="triggerWord" className="text-sm text-red-500">
-                                            <ErrorMessage id="triggerWord" name="triggerWord" />
-                                        </span>
-                                    ) : null}
+                                                    setFieldValue('triggerWord', nextTriggerWord);
+
+                                                    if (
+                                                        currentInvitationMessage.trim() === '' ||
+                                                        currentInvitationMessage === previousDefaultMessage
+                                                    ) {
+                                                        setFieldValue('invitationMessage', nextDefaultMessage);
+                                                    }
+                                                }}
+                                            />
+                                            {errors.triggerWord && touched.triggerWord ? (
+                                                <span id="triggerWord" className="text-sm text-red-500">
+                                                    <ErrorMessage id="triggerWord" name="triggerWord" />
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                                        <p>User will text your keyword to the shortcode to start the survey.</p>
+                                        <p className="mt-2">Once the survey is published, details cannot be updated.</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -523,269 +774,944 @@ export default function Create() {
                 );
 
             case 1: // Questions
+                {
+                    const previewQuestion = values.questions.find(
+                        (question) => question.question.trim().length > 0,
+                    ) ?? values.questions[0];
+                    const previewTriggerWord = values.triggerWord.trim() || 'START';
+                    const previewShortCode = values.shortCode.trim() || '20642';
+                    const canAddNewQuestion = values.questions.every((question) => {
+                        const hasSavedOptions = question.responseType === 'multiple-choice'
+                            ? question.options.length > 0 &&
+                                question.options.every((option) => option.trim().length > 0) &&
+                                question.options.every((_, optionIndex) => Boolean(question.optionSaveStates?.[optionIndex]))
+                            : true;
+
+                        return Boolean(
+                            question.isSaved &&
+                            !question.isEditing &&
+                            question.question.trim().length > 0 &&
+                            hasSavedOptions,
+                        );
+                    });
+                    const childQuestionStateKey = (questionIndex: number, optionIndex: number): string => {
+                        return `${questionIndex}-${optionIndex}`;
+                    };
+                    const createDefaultChildQuestionState = (
+                        questionIndex: number,
+                        optionIndex: number,
+                    ): ChildQuestionOptionState => {
+                        const currentQuestion = values.questions[questionIndex];
+                        const optionBranching = Array.isArray(currentQuestion?.branching)
+                            ? currentQuestion.branching[optionIndex]
+                            : null;
+
+                        return {
+                            childQuestions: [
+                                {
+                                    id: 1,
+                                    question: '',
+                                    responseType: 'free-text',
+                                    branching: '0',
+                                    options: [],
+                                    optionSaveStates: [],
+                                    optionBranching: [],
+                                    allowMultiple: false,
+                                    isSaved: false,
+                                },
+                            ],
+                            followUpBranching: optionBranching !== null && optionBranching !== undefined
+                                ? String(optionBranching)
+                                : '0',
+                        };
+                    };
+                    const simulatorPromptText = `Reply with ${previewTriggerWord} to participate.`;
+                    const nextSimulatorMessageId = (): number => {
+                        const messageId = simulatorMessageCounter.current;
+                        simulatorMessageCounter.current += 1;
+
+                        return messageId;
+                    };
+                    const resetSimulator = (): void => {
+                        simulatorMessageCounter.current = 2;
+                        setSimulatorInput('');
+                        setSimulatorSession({
+                            started: false,
+                            activeNode: null,
+                            messages: [
+                                {
+                                    id: 1,
+                                    sender: 'muted',
+                                    text: simulatorPromptText,
+                                },
+                            ],
+                        });
+                    };
+                    const handleSimulatorSend = (): void => {
+                        const participantReply = simulatorInput.trim();
+
+                        if (participantReply.length === 0) {
+                            return;
+                        }
+
+                        setSimulatorSession((previousSession) => {
+                            const updatedMessages: SimulatorMessage[] = [
+                                ...previousSession.messages,
+                                {
+                                    id: nextSimulatorMessageId(),
+                                    sender: 'user',
+                                    text: participantReply,
+                                },
+                            ];
+
+                            if (!previousSession.started) {
+                                if (participantReply.toLowerCase() !== previewTriggerWord.toLowerCase()) {
+                                    updatedMessages.push({
+                                        id: nextSimulatorMessageId(),
+                                        sender: 'muted',
+                                        text: simulatorPromptText,
+                                    });
+
+                                    return {
+                                        ...previousSession,
+                                        messages: updatedMessages,
+                                    };
+                                }
+
+                                const firstQuestion = values.questions[0];
+                                if (!firstQuestion || firstQuestion.question.trim().length === 0) {
+                                    updatedMessages.push({
+                                        id: nextSimulatorMessageId(),
+                                        sender: 'system',
+                                        text: 'No question is configured yet. Add a question on the left to test the flow.',
+                                    });
+
+                                    return {
+                                        started: false,
+                                        activeNode: null,
+                                        messages: updatedMessages,
+                                    };
+                                }
+
+                                updatedMessages.push({
+                                    id: nextSimulatorMessageId(),
+                                    sender: 'system',
+                                    text: buildSimulatorQuestionText(firstQuestion),
+                                });
+
+                                return {
+                                    started: true,
+                                    activeNode: {
+                                        kind: 'parent',
+                                        questionIndex: 0,
+                                    },
+                                    messages: updatedMessages,
+                                };
+                            }
+                            if (!previousSession.activeNode) {
+                                updatedMessages.push({
+                                    id: nextSimulatorMessageId(),
+                                    sender: 'system',
+                                    text: 'No active question in the simulator. Press reset and try again.',
+                                });
+
+                                return {
+                                    started: false,
+                                    activeNode: null,
+                                    messages: updatedMessages,
+                                };
+                            }
+
+                            const finalizeSurvey = (reason?: string): SimulatorSession => {
+                                if (reason) {
+                                    updatedMessages.push({
+                                        id: nextSimulatorMessageId(),
+                                        sender: 'muted',
+                                        text: reason,
+                                    });
+                                }
+
+                                const completionMessage = values.completionMessage?.trim() || '';
+                                if (completionMessage.length > 0) {
+                                    updatedMessages.push({
+                                        id: nextSimulatorMessageId(),
+                                        sender: 'system',
+                                        text: completionMessage,
+                                    });
+                                } else {
+                                    updatedMessages.push({
+                                        id: nextSimulatorMessageId(),
+                                        sender: 'muted',
+                                        text: 'Add a completion message in Survey Outro to customize the final SMS.',
+                                    });
+                                }
+                                updatedMessages.push({
+                                    id: nextSimulatorMessageId(),
+                                    sender: 'muted',
+                                    text: '-- End of survey --',
+                                });
+
+                                return {
+                                    started: false,
+                                    activeNode: null,
+                                    messages: updatedMessages,
+                                };
+                            };
+
+                            const moveToParentQuestion = (
+                                nextQuestionIndex: number,
+                                endReason?: string,
+                            ): SimulatorSession => {
+                                if (nextQuestionIndex === -1) {
+                                    return finalizeSurvey(endReason);
+                                }
+
+                                const nextQuestion = values.questions[nextQuestionIndex];
+                                if (!nextQuestion || nextQuestion.question.trim().length === 0) {
+                                    updatedMessages.push({
+                                        id: nextSimulatorMessageId(),
+                                        sender: 'system',
+                                        text: 'Next question is empty. Update it on the left panel to continue simulation.',
+                                    });
+
+                                    return {
+                                        started: false,
+                                        activeNode: null,
+                                        messages: updatedMessages,
+                                    };
+                                }
+
+                                updatedMessages.push({
+                                    id: nextSimulatorMessageId(),
+                                    sender: 'system',
+                                    text: buildSimulatorQuestionText(nextQuestion),
+                                });
+
+                                return {
+                                    started: true,
+                                    activeNode: {
+                                        kind: 'parent',
+                                        questionIndex: nextQuestionIndex,
+                                    },
+                                    messages: updatedMessages,
+                                };
+                            };
+
+                            if (previousSession.activeNode.kind === 'parent') {
+                                const activeQuestionIndex = previousSession.activeNode.questionIndex;
+                                const activeQuestion = values.questions[activeQuestionIndex];
+
+                                if (!activeQuestion) {
+                                    return {
+                                        started: false,
+                                        activeNode: null,
+                                        messages: updatedMessages,
+                                    };
+                                }
+
+                                let optionIndex: number | null = null;
+                                let parentEndReason: string | undefined;
+
+                                if (activeQuestion.responseType === 'multiple-choice') {
+                                    const availableOptions = activeQuestion.options
+                                        .map((option) => option.trim())
+                                        .filter((option) => option.length > 0);
+
+                                    optionIndex = parseMultipleChoiceReply(participantReply, availableOptions);
+                                    if (optionIndex === null) {
+                                        updatedMessages.push({
+                                            id: nextSimulatorMessageId(),
+                                            sender: 'system',
+                                            text: `Please reply with option number (1-${availableOptions.length}) or exact option text.`,
+                                        });
+
+                                        return {
+                                            ...previousSession,
+                                            messages: updatedMessages,
+                                        };
+                                    }
+
+                                    const optionState = childQuestionStates[`${activeQuestionIndex}-${optionIndex}`];
+                                    const savedChildQuestions = optionState
+                                        ? optionState.childQuestions.filter(
+                                            (childQuestion) => childQuestion.isSaved && childQuestion.question.trim().length > 0,
+                                        )
+                                        : [];
+
+                                    if (savedChildQuestions.length > 0) {
+                                        updatedMessages.push({
+                                            id: nextSimulatorMessageId(),
+                                            sender: 'system',
+                                            text: buildSimulatorChildQuestionText(savedChildQuestions[0]),
+                                        });
+
+                                        return {
+                                            started: true,
+                                            activeNode: {
+                                                kind: 'child',
+                                                parentQuestionIndex: activeQuestionIndex,
+                                                optionIndex,
+                                                childQuestionIndex: 0,
+                                                followUpBranching: optionState?.followUpBranching ?? null,
+                                            },
+                                            messages: updatedMessages,
+                                        };
+                                    }
+
+                                    if (!activeQuestion.allowMultiple) {
+                                        const selectedOptionTarget = Array.isArray(activeQuestion.branching)
+                                            ? activeQuestion.branching[optionIndex] ?? null
+                                            : null;
+
+                                        if (isBranchingEndTarget(selectedOptionTarget)) {
+                                            parentEndReason = `Flow ended at Question ${activeQuestionIndex + 1} by "After child questions, go to: End Survey" for option ${optionIndex + 1}.`;
+                                        }
+                                    }
+                                }
+
+                                if (
+                                    activeQuestion.responseType !== 'multiple-choice' ||
+                                    activeQuestion.allowMultiple
+                                ) {
+                                    if (isBranchingEndTarget(activeQuestion.branching)) {
+                                        parentEndReason = `Flow ended at Question ${activeQuestionIndex + 1} by "After answer has been submitted, go to: End Survey".`;
+                                    }
+                                }
+
+                                const nextQuestionIndex = resolveNextSimulatorQuestionIndex(
+                                    activeQuestion,
+                                    activeQuestionIndex,
+                                    values.questions.length,
+                                    optionIndex,
+                                );
+
+                                return moveToParentQuestion(nextQuestionIndex, parentEndReason);
+                            }
+
+                            const {
+                                parentQuestionIndex,
+                                optionIndex,
+                                childQuestionIndex,
+                                followUpBranching,
+                            } = previousSession.activeNode;
+                            const optionState = childQuestionStates[`${parentQuestionIndex}-${optionIndex}`];
+                            const savedChildQuestions = optionState
+                                ? optionState.childQuestions.filter(
+                                    (childQuestion) => childQuestion.isSaved && childQuestion.question.trim().length > 0,
+                                )
+                                : [];
+
+                            const activeChildQuestion = savedChildQuestions[childQuestionIndex];
+                            if (!activeChildQuestion) {
+                                const nextParentQuestionIndex = resolveNextParentQuestionIndexFromTarget(
+                                    followUpBranching,
+                                    parentQuestionIndex,
+                                    values.questions.length,
+                                );
+
+                                return moveToParentQuestion(
+                                    nextParentQuestionIndex,
+                                    'Flow ended by "After child questions, go to: End Survey".',
+                                );
+                            }
+
+                            let childOptionIndex: number | null = null;
+                            if (activeChildQuestion.responseType === 'multiple-choice') {
+                                const childOptions = (activeChildQuestion.options ?? [])
+                                    .map((option) => option.trim())
+                                    .filter((option) => option.length > 0);
+
+                                childOptionIndex = parseMultipleChoiceReply(participantReply, childOptions);
+                                if (childOptionIndex === null) {
+                                    updatedMessages.push({
+                                        id: nextSimulatorMessageId(),
+                                        sender: 'system',
+                                        text: `Please reply with option number (1-${childOptions.length}) or exact option text.`,
+                                    });
+
+                                    return {
+                                        ...previousSession,
+                                        messages: updatedMessages,
+                                    };
+                                }
+                            }
+
+                            const nextChildQuestionIndex = resolveNextChildQuestionIndex(
+                                activeChildQuestion,
+                                childQuestionIndex,
+                                savedChildQuestions.length,
+                                childOptionIndex,
+                            );
+
+                            if (nextChildQuestionIndex === -1) {
+                                let childExitReason = `Exited child flow from Question ${parentQuestionIndex + 1}.${childQuestionIndex + 1}.`;
+
+                                if (
+                                    activeChildQuestion.responseType === 'multiple-choice' &&
+                                    !activeChildQuestion.allowMultiple &&
+                                    childOptionIndex !== null
+                                ) {
+                                    const selectedChildOptionTarget = Array.isArray(activeChildQuestion.optionBranching)
+                                        ? activeChildQuestion.optionBranching[childOptionIndex] ?? activeChildQuestion.branching
+                                        : activeChildQuestion.branching;
+
+                                    if (isBranchingEndTarget(selectedChildOptionTarget)) {
+                                        childExitReason = `Exited child flow at Question ${parentQuestionIndex + 1}.${childQuestionIndex + 1} via "If option ${childOptionIndex + 1} is picked, go to: Exit Child Questions".`;
+                                    }
+                                } else if (isBranchingEndTarget(activeChildQuestion.branching)) {
+                                    childExitReason = `Exited child flow at Question ${parentQuestionIndex + 1}.${childQuestionIndex + 1} via "After answer has been submitted, go to: Exit Child Questions".`;
+                                }
+
+                                const nextParentQuestionIndex = resolveNextParentQuestionIndexFromTarget(
+                                    followUpBranching,
+                                    parentQuestionIndex,
+                                    values.questions.length,
+                                );
+
+                                const parentFollowUpEndReason = isBranchingEndTarget(followUpBranching)
+                                    ? `${childExitReason} Then ended by "After child questions, go to: End Survey".`
+                                    : undefined;
+
+                                return moveToParentQuestion(
+                                    nextParentQuestionIndex,
+                                    parentFollowUpEndReason,
+                                );
+                            }
+
+                            const nextChildQuestion = savedChildQuestions[nextChildQuestionIndex];
+                            if (!nextChildQuestion) {
+                                const nextParentQuestionIndex = resolveNextParentQuestionIndexFromTarget(
+                                    followUpBranching,
+                                    parentQuestionIndex,
+                                    values.questions.length,
+                                );
+
+                                const parentFollowUpEndReason = isBranchingEndTarget(followUpBranching)
+                                    ? `Flow ended by "After child questions, go to: End Survey" after child questions of Question ${parentQuestionIndex + 1}.`
+                                    : undefined;
+
+                                return moveToParentQuestion(
+                                    nextParentQuestionIndex,
+                                    parentFollowUpEndReason,
+                                );
+                            }
+
+                            updatedMessages.push({
+                                id: nextSimulatorMessageId(),
+                                sender: 'system',
+                                text: buildSimulatorChildQuestionText(nextChildQuestion),
+                            });
+
+                            return {
+                                started: true,
+                                activeNode: {
+                                    kind: 'child',
+                                    parentQuestionIndex,
+                                    optionIndex,
+                                    childQuestionIndex: nextChildQuestionIndex,
+                                    followUpBranching,
+                                },
+                                messages: updatedMessages,
+                            };
+                        });
+
+                        setSimulatorInput('');
+                    };
+
                 return (
                     <>
-                        <div className='space-y-6'>
-                            <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm md:px-6">
-                                <h1 className="text-lg font-semibold text-slate-900">Create Questions</h1>
-                                <p className="mt-1 text-sm text-slate-500">
-                                    Design your survey flow by defining each question and where participants go next.
-                                </p>
-                            </div>
+                        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_460px]">
+                            <div className='space-y-6'>
+                                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm md:px-6">
+                                    <h1 className="text-lg font-semibold text-slate-900">Create Questions</h1>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        Design your survey flow by defining each question and where participants go next.
+                                    </p>
+                                </div>
 
-                            {values.questions.map((question: Question, index: number) => (
-                                <div key={index} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
-                                    <div className="mb-5 flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
-                                                {index + 1}
-                                            </span>
-                                            <h2 className="text-base font-semibold text-slate-900">Question {index + 1}</h2>
-                                        </div>
-                                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-                                            {question.responseType === 'multiple-choice' ? 'Multiple choice' : 'Free text'}
-                                        </span>
-                                    </div>
-
-                                    <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-[2fr_1fr]">
-                                        <div className='space-y-1.5'>
-                                            <label className="block text-sm font-medium text-slate-700">
-                                                Question Text
-                                            </label>
-                                            <Field
-                                                name={`questions[${index}].question`}
-                                                type="text"
-                                                className="h-11 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
-                                                placeholder="Enter your question"
-                                                onFocus={() => {
-                                                    if (question.isSaved) {
-                                                        setFieldValue(`questions[${index}].isEditing`, true);
-                                                    }
-                                                }}
-                                            />
-                                            <span className="text-sm text-red-500">
-                                                <ErrorMessage name={`questions[${index}].question`} />
+                                {values.questions.map((question: Question, index: number) => (
+                                    <div key={index} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+                                        <div className="mb-5 flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
+                                                    {index + 1}
+                                                </span>
+                                                <h2 className="text-base font-semibold text-slate-900">Question {index + 1}</h2>
+                                            </div>
+                                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                                                {question.responseType === 'multiple-choice' ? 'Multiple choice' : 'Free text'}
                                             </span>
                                         </div>
 
-                                        <div className='space-y-1.5'>
-                                            <label className="block text-sm font-medium text-slate-700">Response Type</label>
-                                            <Field
-                                                name={`questions[${index}].responseType`}
-                                                as="select"
-                                                className="h-11 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-slate-700 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
-                                                onFocus={() => {
-                                                    if (question.isSaved) {
-                                                        setFieldValue(`questions[${index}].isEditing`, true);
-                                                    }
-                                                }}
-                                            >
-                                                <option value="free-text">Free Text</option>
-                                                <option value="multiple-choice">Multiple Choice</option>
-                                            </Field>
-                                            <span className="text-sm text-red-500">
-                                                <ErrorMessage name={`questions[${index}].responseType`} />
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {question.responseType === "multiple-choice" && (
-                                        <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                                            <div className="mb-3 flex items-center justify-between">
-                                                <label className="text-sm font-medium text-slate-700">Options</label>
-                                                <Button
-                                                    type="button"
-                                                    variant='outline'
-                                                    onClick={() => {
-                                                        const newOptions = [...question.options, ""];
-                                                        setFieldValue(`questions[${index}].options`, newOptions);
+                                        <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-[2fr_1fr]">
+                                            <div className='space-y-1.5'>
+                                                <label className="block text-sm font-medium text-slate-700">
+                                                    Question Text
+                                                </label>
+                                                <Field
+                                                    name={`questions[${index}].question`}
+                                                    type="text"
+                                                    className="h-11 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+                                                    placeholder="Enter your question"
+                                                    onFocus={() => {
+                                                        if (question.isSaved) {
+                                                            setFieldValue(`questions[${index}].isEditing`, true);
+                                                        }
                                                     }}
-                                                    className="h-9 border-blue-300 bg-white text-blue-600 hover:bg-blue-50"
-                                                >
-                                                    Add Option
-                                                </Button>
+                                                />
+                                                <span className="text-sm text-red-500">
+                                                    <ErrorMessage name={`questions[${index}].question`} />
+                                                </span>
                                             </div>
 
-                                            <div className="space-y-3">
-                                                {question.options.map((option: string, optionIndex: number) => (
-                                                    <div key={optionIndex} className="rounded-lg border border-slate-200 bg-white p-3">
-                                                        <div className='mb-2 flex items-center justify-between'>
-                                                            <span className="text-sm font-medium text-slate-700">Label {optionIndex + 1}</span>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => {
-                                                                    const newOptions = question.options.filter((_, i: number) => i !== optionIndex);
-                                                                    setFieldValue(`questions[${index}].options`, newOptions);
-                                                                }}
-                                                                className="flex items-center space-x-1 text-xs text-red-500 hover:text-red-700"
-                                                            >
-                                                                <span className="text-base">×</span>
-                                                                <span>Remove</span>
-                                                            </button>
-                                                        </div>
+                                            <div className='space-y-1.5'>
+                                                <label className="block text-sm font-medium text-slate-700">Response Type</label>
+                                                <Field
+                                                    name={`questions[${index}].responseType`}
+                                                    as="select"
+                                                    className="h-11 w-full rounded-lg border border-slate-200 bg-white px-4 text-sm text-slate-700 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+                                                    onFocus={() => {
+                                                        if (question.isSaved) {
+                                                            setFieldValue(`questions[${index}].isEditing`, true);
+                                                        }
+                                                    }}
+                                                >
+                                                    <option value="free-text">Free Text</option>
+                                                    <option value="multiple-choice">Multiple Choice</option>
+                                                </Field>
+                                                <span className="text-sm text-red-500">
+                                                    <ErrorMessage name={`questions[${index}].responseType`} />
+                                                </span>
+                                            </div>
+                                        </div>
 
-                                                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                                            <Field
-                                                                name={`questions[${index}].options[${optionIndex}]`}
-                                                                type="text"
-                                                                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
-                                                                placeholder={`Option ${optionIndex + 1}`}
-                                                            />
-                                                            <div className="space-y-1.5">
-                                                                <label className="block text-xs font-medium text-slate-600">After child questions, go to:</label>
-                                                                <Field
-                                                                    as="select"
-                                                                    name={`questions[${index}].branching[${optionIndex}]`}
-                                                                    className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+                                        {question.responseType === "multiple-choice" && question.isSaved && (
+                                            <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                                <div className="mb-3">
+                                                    <label className="text-sm font-medium text-slate-700">Options</label>
+                                                </div>
+
+                                                <div className="mb-4 flex items-center space-x-2">
+                                                    <Field
+                                                        type="checkbox"
+                                                        name={`questions[${index}].allowMultiple`}
+                                                        id={`allowMultiple-${index}`}
+                                                        className="h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+                                                    />
+                                                    <label htmlFor={`allowMultiple-${index}`} className="text-sm font-medium text-slate-700">
+                                                        Allow participant to pick more than one option
+                                                    </label>
+                                                </div>
+
+                                                <div className="space-y-3">
+                                                    {question.options.map((option: string, optionIndex: number) => (
+                                                        <div key={optionIndex} className="rounded-lg border border-slate-200 bg-white p-3">
+                                                            <div className='mb-2 flex items-center justify-between'>
+                                                                <span className="text-sm font-medium text-slate-700">Label {optionIndex + 1}</span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        const newOptions = question.options.filter((_, i: number) => i !== optionIndex);
+                                                                        const newOptionSaveStates = (question.optionSaveStates ?? []).filter((_, i: number) => i !== optionIndex);
+                                                                        setFieldValue(`questions[${index}].options`, newOptions);
+                                                                        setFieldValue(`questions[${index}].optionSaveStates`, newOptionSaveStates);
+                                                                    }}
+                                                                    className="flex items-center space-x-1 text-xs text-red-500 hover:text-red-700"
                                                                 >
-                                                                    <option value="0" disabled className="text-gray-400">
-                                                                        Next Question, if added
-                                                                    </option>
-                                                                    {values.questions.map((q: Question, qIndex: number) => (
-                                                                        qIndex !== index && (
-                                                                            <option key={qIndex} value={qIndex}>
-                                                                                Question {qIndex + 1}
+                                                                    <span className="text-base">×</span>
+                                                                    <span>Remove</span>
+                                                                </button>
+                                                            </div>
+
+                                                            <div
+                                                                className={`grid grid-cols-1 gap-3 md:items-end ${
+                                                                    question.allowMultiple
+                                                                        ? 'md:grid-cols-[minmax(0,1fr)_220px]'
+                                                                        : 'md:grid-cols-[minmax(0,1fr)_220px_220px]'
+                                                                }`}
+                                                            >
+                                                                <input
+                                                                    value={option}
+                                                                    type="text"
+                                                                    className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+                                                                    placeholder={`Option ${optionIndex + 1}`}
+                                                                    onChange={(event) => {
+                                                                        const nextOptions = [...question.options];
+                                                                        nextOptions[optionIndex] = event.target.value;
+
+                                                                        const nextOptionSaveStates = [...(question.optionSaveStates ?? [])];
+                                                                        nextOptionSaveStates[optionIndex] = false;
+
+                                                                        setFieldValue(`questions[${index}].options`, nextOptions);
+                                                                        setFieldValue(`questions[${index}].optionSaveStates`, nextOptionSaveStates);
+                                                                    }}
+                                                                />
+                                                                {question.optionSaveStates?.[optionIndex] ? (
+                                                                    <div>
+                                                                        {(() => {
+                                                                            const optionStateKey = childQuestionStateKey(index, optionIndex);
+                                                                            const optionChildState = childQuestionStates[optionStateKey];
+                                                                            const savedChildQuestionsCount = optionChildState
+                                                                                ? optionChildState.childQuestions.filter((childQuestion) => childQuestion.isSaved).length
+                                                                                : 0;
+
+                                                                            return (
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="outline"
+                                                                            className="h-10 w-full border-blue-400 text-blue-700 hover:bg-blue-50"
+                                                                            onClick={() => {
+                                                                                const defaultOptionState = createDefaultChildQuestionState(index, optionIndex);
+                                                                                setChildQuestionStates((previousState) => {
+                                                                                    if (previousState[optionStateKey]) {
+                                                                                        return previousState;
+                                                                                    }
+
+                                                                                    return {
+                                                                                        ...previousState,
+                                                                                        [optionStateKey]: defaultOptionState,
+                                                                                    };
+                                                                                });
+                                                                                setActiveChildQuestionModal({
+                                                                                    questionIndex: index,
+                                                                                    optionIndex,
+                                                                                });
+                                                                            }}
+                                                                        >
+                                                                            {savedChildQuestionsCount > 0
+                                                                                ? `${savedChildQuestionsCount} Child Question${savedChildQuestionsCount > 1 ? 's' : ''}`
+                                                                                : 'Add Child Questions'}
+                                                                        </Button>
+                                                                            );
+                                                                        })()}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex items-end">
+                                                                        {option.trim().length > 0 ? (
+                                                                            <Button
+                                                                                type="button"
+                                                                                className="h-10 w-full bg-blue-600 text-white hover:bg-blue-700"
+                                                                                onClick={() => {
+                                                                                    const nextOptionSaveStates = [...(question.optionSaveStates ?? [])];
+                                                                                    nextOptionSaveStates[optionIndex] = true;
+                                                                                    setFieldValue(`questions[${index}].optionSaveStates`, nextOptionSaveStates);
+                                                                                }}
+                                                                            >
+                                                                                Save Option
+                                                                            </Button>
+                                                                        ) : (
+                                                                            <div className="h-10 w-full" />
+                                                                        )}
+                                                                    </div>
+                                                                )}
+
+                                                                {!question.allowMultiple && question.optionSaveStates?.[optionIndex] ? (
+                                                                    <div className="space-y-1.5">
+                                                                        <label className="block text-xs font-medium text-slate-600">After child questions, go to:</label>
+                                                                        <Field
+                                                                            as="select"
+                                                                            name={`questions[${index}].branching[${optionIndex}]`}
+                                                                            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+                                                                        >
+                                                                            <option value="0" disabled className="text-gray-400">
+                                                                                Next Question, if added
                                                                             </option>
-                                                                        )
-                                                                    ))}
-                                                                    <option className="disabled:cursor-not-allowed" value="-2" disabled={true}>
-                                                                        -- No More Options --
-                                                                    </option>
-                                                                    <option value="-1">End Survey</option>
-                                                                </Field>
+                                                                            {values.questions.map((q: Question, qIndex: number) => (
+                                                                                qIndex !== index && (
+                                                                                    <option key={qIndex} value={qIndex}>
+                                                                                        Question {qIndex + 1}
+                                                                                    </option>
+                                                                                )
+                                                                            ))}
+                                                                            <option className="disabled:cursor-not-allowed" value="-2" disabled={true}>
+                                                                                -- No More Options --
+                                                                            </option>
+                                                                            <option value="-1">End Survey</option>
+                                                                        </Field>
+                                                                    </div>
+                                                                ) : null}
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                                    ))}
+                                                </div>
 
-                                            <div className="mt-4 flex items-center space-x-2">
-                                                <Field
-                                                    type="checkbox"
-                                                    name={`questions[${index}].allowMultiple`}
-                                                    id={`allowMultiple-${index}`}
-                                                    className="h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+                                                <div className="mt-4">
+                                                    <Button
+                                                        type="button"
+                                                        variant='outline'
+                                                        onClick={() => {
+                                                            const newOptions = [...question.options, ""];
+                                                            const newOptionSaveStates = [...(question.optionSaveStates ?? []), false];
+                                                            setFieldValue(`questions[${index}].options`, newOptions);
+                                                            setFieldValue(`questions[${index}].optionSaveStates`, newOptionSaveStates);
+                                                        }}
+                                                        className="h-9 border-blue-300 bg-white text-blue-600 hover:bg-blue-50"
+                                                    >
+                                                        Add Option
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {question.responseType === "free-text" && (
+                                            <div className='mt-5 space-y-1.5'>
+                                                <label className="block text-sm font-medium text-slate-700">Explanation (Optional)</label>
+                                                <textarea
+                                                    value=""
+                                                    readOnly
+                                                    disabled
+                                                    className="w-full rounded-lg border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500"
+                                                    placeholder="Participants will give an open-ended answer..."
                                                 />
-                                                <label htmlFor={`allowMultiple-${index}`} className="text-sm font-medium text-slate-700">
-                                                    Allow participant to pick more than one option
+                                            </div>
+                                        )}
+
+                                        {(question.responseType !== 'multiple-choice' || question.allowMultiple) ? (
+                                            <div className='mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4'>
+                                                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                                                    {question.responseType === 'multiple-choice' && question.allowMultiple
+                                                        ? 'After all Child Questions have been answered, go to:'
+                                                        : 'After answer has been submitted, go to:'}
                                                 </label>
+                                                <Field
+                                                    as="select"
+                                                    name={`questions[${index}].branching`}
+                                                    className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+                                                >
+                                                    <option value="0" disabled className="text-gray-400">
+                                                        Next Question, if added
+                                                    </option>
+                                                    {values.questions.map((q: Question, qIndex: number) => (
+                                                        qIndex !== index && (
+                                                            <option key={qIndex} value={qIndex}>
+                                                                Question {qIndex + 1}
+                                                            </option>
+                                                        )
+                                                    ))}
+                                                    <option className="disabled:cursor-not-allowed" value="-2" disabled={true}>
+                                                        -- No questions --
+                                                    </option>
+                                                    <option value="-1">End Survey</option>
+                                                </Field>
+                                            </div>
+                                        ) : null}
+
+                                        <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                                            <p className="text-sm text-slate-500">{question.question?.length || 0} characters</p>
+                                            <div className="flex items-center gap-3">
+                                                {(question.isEditing || !question.isSaved) && (
+                                                    <div className="flex items-center space-x-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5">
+                                                        <TriangleAlert className="h-4 w-4 text-amber-600" />
+                                                        <span className={`text-xs ${question.isSaving ? 'text-amber-700' : 'text-red-600'}`}>
+                                                            {question.isSaving ? "Saving Question..." : "Question Not Saved"}
+                                                        </span>
+                                                    </div>
+                                                )}
+
+                                                {(question.isEditing || !question.isSaved) && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="secondary"
+                                                        onClick={async () => {
+                                                            if (!question.question) {
+                                                                setFieldValue(`questions[${index}].isEditing`, true);
+                                                                return;
+                                                            }
+
+                                                            if (
+                                                                question.responseType === 'multiple-choice' &&
+                                                                question.options.length === 0
+                                                            ) {
+                                                                setFieldValue(`questions[${index}].options`, ['']);
+                                                                setFieldValue(`questions[${index}].optionSaveStates`, [false]);
+                                                            }
+
+                                                            setFieldValue(`questions[${index}].isSaving`, true);
+                                                            await new Promise((resolve) => setTimeout(resolve, 1000));
+                                                            setFieldValue(`questions[${index}].isSaving`, false);
+                                                            setFieldValue(`questions[${index}].isSaved`, true);
+                                                            setFieldValue(`questions[${index}].isEditing`, false);
+                                                        }}
+                                                        className="h-9"
+                                                    >
+                                                        Save Question
+                                                    </Button>
+                                                )}
+
+                                                {question.isSaved && !question.isEditing && (
+                                                    <button
+                                                        type="button"
+                                                        className="rounded-md border border-slate-300 p-2 text-slate-600 transition hover:border-red-400 hover:bg-red-50 hover:text-red-600"
+                                                        onClick={() => {
+                                                            setDeleteConfirmation({
+                                                                isOpen: true,
+                                                                questionIndex: index,
+                                                            });
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
-                                    )}
+                                    </div>
+                                ))}
 
-                                    {question.responseType === "free-text" && (
-                                        <div className='mt-5 space-y-1.5'>
-                                            <label className="block text-sm font-medium text-slate-700">Explanation (Optional)</label>
-                                            <textarea
-                                                value=""
-                                                readOnly
-                                                disabled
-                                                className="w-full rounded-lg border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500"
-                                                placeholder="Participants will give an open-ended answer..."
-                                            />
-                                        </div>
-                                    )}
-
-                                    <div className='mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4'>
-                                        <label className="mb-1.5 block text-sm font-medium text-slate-700">After answer has been submitted, go to:</label>
-                                        <Field
-                                            as="select"
-                                            name={`questions[${index}].branching`}
-                                            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+                                {canAddNewQuestion ? (
+                                    <div className='flex items-center justify-end'>
+                                        <Button
+                                            type="button"
+                                            onClick={() => {
+                                                const newQuestion = {
+                                                    question: '',
+                                                    responseType: "free-text",
+                                                    options: [],
+                                                    optionSaveStates: [],
+                                                    allowMultiple: false,
+                                                    freeTextDescription: '',
+                                                    isSaved: true,
+                                                    isSaving: false,
+                                                    isEditing: false,
+                                                    branching: null
+                                                };
+                                                setFieldValue("questions", [...values.questions, newQuestion]);
+                                            }}
+                                            className="h-10 px-5"
                                         >
-                                            <option value="0" disabled className="text-gray-400">
-                                                Next Question, if added
-                                            </option>
-                                            {values.questions.map((q: Question, qIndex: number) => (
-                                                qIndex !== index && (
-                                                    <option key={qIndex} value={qIndex}>
-                                                        Question {qIndex + 1}
-                                                    </option>
-                                                )
-                                            ))}
-                                            <option className="disabled:cursor-not-allowed" value="-2" disabled={true}>
-                                                -- No questions --
-                                            </option>
-                                            <option value="-1">End Survey</option>
-                                        </Field>
+                                            Add New Question
+                                        </Button>
+                                    </div>
+                                ) : null}
+                            </div>
+
+                            <div className="self-start lg:sticky lg:top-4">
+                                <div className="rounded-2xl border border-slate-200 bg-white shadow-sm lg:max-h-[calc(100vh-1.5rem)] lg:overflow-y-auto">
+                                    <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+                                                {previewShortCode.slice(0, 2)}
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-semibold text-slate-900">{previewShortCode}</p>
+                                                <p className="text-xs text-slate-500">Survey Simulator</p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="rounded-md border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50"
+                                            onClick={resetSimulator}
+                                        >
+                                            <RotateCcw className="h-4 w-4" />
+                                        </button>
                                     </div>
 
-                                    <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                                        <p className="text-sm text-slate-500">{question.question?.length || 0} characters</p>
-                                        <div className="flex items-center gap-3">
-                                            {(question.isEditing || !question.isSaved) && (
-                                                <div className="flex items-center space-x-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5">
-                                                    <TriangleAlert className="h-4 w-4 text-amber-600" />
-                                                    <span className={`text-xs ${question.isSaving ? 'text-amber-700' : 'text-red-600'}`}>
-                                                        {question.isSaving ? "Saving Question..." : "Question Not Saved"}
-                                                    </span>
+                                    <div className="space-y-3 bg-slate-50 p-4">
+                                        {simulatorSession.messages.map((message) => {
+                                            const isEndMarker = message.text === '-- End of survey --';
+                                            const displayText = !simulatorSession.started && message.id === 1
+                                                ? simulatorPromptText
+                                                : message.text;
+
+                                            return (
+                                                <div
+                                                    key={message.id}
+                                                    className={`rounded-xl px-3 py-2 text-sm shadow-sm ${
+                                                        message.sender === 'user'
+                                                            ? 'ml-auto max-w-[95%] bg-blue-100 text-blue-900'
+                                                            : message.sender === 'muted'
+                                                                ? `max-w-[95%] bg-slate-100 text-slate-500 ${isEndMarker ? 'mx-auto text-center font-medium' : ''}`
+                                                                : 'max-w-[95%] bg-white text-slate-800'
+                                                    }`}
+                                                >
+                                                    <p className="whitespace-pre-line">{displayText}</p>
                                                 </div>
-                                            )}
+                                            );
+                                        })}
+                                        {!previewQuestion?.question ? (
+                                            <div className="max-w-[95%] rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-500">
+                                                Add your first question to preview and test the full SMS flow.
+                                            </div>
+                                        ) : null}
+                                    </div>
 
-                                            {(question.isEditing || !question.isSaved) && (
-                                                <Button
-                                                    type="button"
-                                                    variant="secondary"
-                                                    onClick={async () => {
-                                                        if (!question.question) {
-                                                            setFieldValue(`questions[${index}].isEditing`, true);
-                                                            return;
-                                                        }
-
-                                                        setFieldValue(`questions[${index}].isSaving`, true);
-                                                        await new Promise((resolve) => setTimeout(resolve, 1000));
-                                                        setFieldValue(`questions[${index}].isSaving`, false);
-                                                        setFieldValue(`questions[${index}].isSaved`, true);
-                                                        setFieldValue(`questions[${index}].isEditing`, false);
-                                                    }}
-                                                    className="h-9"
-                                                >
-                                                    Save Question
-                                                </Button>
-                                            )}
-
-                                            {question.isSaved && !question.isEditing && (
-                                                <button
-                                                    type="button"
-                                                    className="rounded-md border border-slate-300 p-2 text-slate-600 transition hover:border-red-400 hover:bg-red-50 hover:text-red-600"
-                                                    onClick={() => {
-                                                        setDeleteConfirmation({
-                                                            isOpen: true,
-                                                            questionIndex: index,
-                                                        });
-                                                    }}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
-                                            )}
+                                    <div className="border-t border-slate-200 bg-white p-3">
+                                        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                            <input
+                                                type="text"
+                                                value={simulatorInput}
+                                                onChange={(event) => {
+                                                    setSimulatorInput(event.target.value);
+                                                }}
+                                                onKeyDown={(event) => {
+                                                    if (event.key === 'Enter') {
+                                                        event.preventDefault();
+                                                        handleSimulatorSend();
+                                                    }
+                                                }}
+                                                placeholder="Text message"
+                                                className="w-full border-0 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={handleSimulatorSend}
+                                                className="rounded-md p-1 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
+                                            >
+                                                <SendHorizontal className="h-4 w-4" />
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
-                            ))}
-
-                            <div className='flex items-center justify-end'>
-                                <Button
-                                    type="button"
-                                    onClick={() => {
-                                        const newQuestion = {
-                                            question: '',
-                                            responseType: "free-text",
-                                            options: [],
-                                            allowMultiple: false,
-                                            freeTextDescription: '',
-                                            isSaved: true,
-                                            isSaving: false,
-                                            isEditing: false,
-                                            branching: null
-                                        };
-                                        setFieldValue("questions", [...values.questions, newQuestion]);
-                                    }}
-                                    className="h-10 px-5"
-                                >
-                                    Add New Question
-                                </Button>
                             </div>
                         </div>
+
+                        {activeChildQuestionModal ? (
+                            <ChildQuestionsModal
+                                isOpen={activeChildQuestionModal !== null}
+                                onClose={() => {
+                                    setActiveChildQuestionModal(null);
+                                }}
+                                parentQuestionNumber={activeChildQuestionModal.questionIndex + 1}
+                                optionNumber={activeChildQuestionModal.optionIndex + 1}
+                                optionText={
+                                    values.questions[activeChildQuestionModal.questionIndex]?.options[activeChildQuestionModal.optionIndex] ?? ''
+                                }
+                                initialState={
+                                    childQuestionStates[
+                                        childQuestionStateKey(
+                                            activeChildQuestionModal.questionIndex,
+                                            activeChildQuestionModal.optionIndex,
+                                        )
+                                    ] ?? createDefaultChildQuestionState(
+                                        activeChildQuestionModal.questionIndex,
+                                        activeChildQuestionModal.optionIndex,
+                                    )
+                                }
+                                onSaveState={(savedState) => {
+                                    const stateKey = childQuestionStateKey(
+                                        activeChildQuestionModal.questionIndex,
+                                        activeChildQuestionModal.optionIndex,
+                                    );
+
+                                    setChildQuestionStates((previousState) => {
+                                        return {
+                                            ...previousState,
+                                            [stateKey]: savedState,
+                                        };
+                                    });
+
+                                    setFieldValue(
+                                        `questions[${activeChildQuestionModal.questionIndex}].branching[${activeChildQuestionModal.optionIndex}]`,
+                                        savedState.followUpBranching,
+                                    );
+                                }}
+                                availableTargets={values.questions.map((questionItem: Question, questionItemIndex: number) => {
+                                    return {
+                                        value: String(questionItemIndex),
+                                        label: `Question ${questionItemIndex + 1}`,
+                                    };
+                                })}
+                            />
+                        ) : null}
 
                         <DeleteConfirmationDialog
                             isOpen={deleteConfirmation.isOpen}
@@ -797,6 +1723,7 @@ export default function Create() {
                         />
                     </>
                 );
+                }
 
             case 2: // Survey Outro
                 return (
@@ -1156,7 +2083,7 @@ export default function Create() {
                                             <Field
                                                 name='search'
                                                 type="text"
-                                                className="h-10 min-w-[220px] rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+                                                className="h-10 min-w-55 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
                                                 placeholder="Search for recipient"
                                             />
 
@@ -1239,7 +2166,7 @@ export default function Create() {
                                     <Field
                                         as="textarea"
                                         name="invitationMessage"
-                                        className="min-h-[120px] w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+                                        className="min-h-30 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
                                         rows={4}
                                         placeholder="Reply with START to participate"
                                     />
@@ -1378,7 +2305,7 @@ export default function Create() {
                                             <Field
                                                 name='search'
                                                 type="text"
-                                                className="h-10 min-w-[220px] rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+                                                className="h-10 min-w-55 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
                                                 placeholder="Search for Messages"
                                             />
                                             <Button
@@ -1459,7 +2386,7 @@ export default function Create() {
                 scheduleTime: values.scheduleMode === 'now'
                     ? getCurrentDateTimeLocalValue()
                     : values.scheduleTime,
-                questions: values.questions.map((q) => {
+                questions: values.questions.map((q, questionIndex) => {
                     // Ensure branching is always an array or null
                     let branching = q.branching;
 
@@ -1478,6 +2405,30 @@ export default function Create() {
                         allowMultiple: q.allowMultiple || false,
                         freeTextDescription: q.freeTextDescription,
                         branching: branching, // This will be an array or null
+                        childQuestionStates: q.options.map((_, optionIndex) => {
+                            const optionChildState = childQuestionStates[`${questionIndex}-${optionIndex}`];
+
+                            if (!optionChildState) {
+                                return null;
+                            }
+
+                            return {
+                                followUpBranching: optionChildState.followUpBranching,
+                                childQuestions: optionChildState.childQuestions.map((childQuestion) => {
+                                    return {
+                                        id: childQuestion.id,
+                                        question: childQuestion.question,
+                                        responseType: childQuestion.responseType,
+                                        branching: childQuestion.branching,
+                                        options: childQuestion.options,
+                                        optionSaveStates: childQuestion.optionSaveStates,
+                                        optionBranching: childQuestion.optionBranching,
+                                        allowMultiple: childQuestion.allowMultiple,
+                                        isSaved: childQuestion.isSaved,
+                                    };
+                                }),
+                            };
+                        }),
                     };
                 }),
                 recipients: values.recipients.map((r) => ({
@@ -1547,6 +2498,7 @@ export default function Create() {
                         !values.description ||
                         !values.startDate ||
                         !values.endDate ||
+                        !values.shortCode ||
                         !values.triggerWord ||
                         !isTriggerWordUnique(values.triggerWord))
                 ) {
@@ -1554,6 +2506,7 @@ export default function Create() {
                     validateField('description');
                     validateField('startDate');
                     validateField('endDate');
+                    validateField('shortCode');
                     validateField('triggerWord');
                     setTouched(
                         {
@@ -1561,6 +2514,7 @@ export default function Create() {
                             description: true,
                             startDate: true,
                             endDate: true,
+                            shortCode: true,
                             triggerWord: true,
                         },
                         true,
@@ -1571,6 +2525,7 @@ export default function Create() {
                     !errors.description &&
                     !errors.startDate &&
                     !errors.endDate &&
+                    !errors.shortCode &&
                     !errors.triggerWord &&
                     isTriggerWordUnique(values.triggerWord)
                 ) {
@@ -1671,6 +2626,7 @@ export default function Create() {
                 values.description &&
                 values.startDate &&
                 values.endDate &&
+                values.shortCode &&
                 values.triggerWord &&
                 isTriggerWordUnique(values.triggerWord),
         );
@@ -1693,7 +2649,7 @@ export default function Create() {
     return (
         <AppLayout>
             <Head title="Create Surveys Questions" />
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+            <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
                 <Formik
                     initialValues={initialValues}
                     onSubmit={handleSubmit}
@@ -1849,20 +2805,22 @@ export default function Create() {
                                             ) : (
                                                 <Button
                                                     type="button"
-                                                    variant="default"
-                                                    className="w-auto space-x-2 rounded-lg border border-transparent px-6 py-3 text-base font-semibold shadow-sm focus:outline-none"
-                                                    onClick={() =>
+                                                    onClick={async () => {
+                                                        if (currentStep === 0) {
+                                                            await setFieldValue('submissionAction', 'draft');
+                                                        }
+
                                                         handleNextStep(
                                                             values,
                                                             validateField,
                                                             setTouched,
                                                             errors,
                                                             submitForm,
-                                                        )
-                                                    }
+                                                        );
+                                                    }}
                                                     disabled={isSubmitting}
                                                 >
-                                                    <span>Next</span>
+                                                    <span>{currentStep === 0 ? 'Save' : 'Next'}</span>
                                                     <MoveRight />
                                                 </Button>
                                             )}

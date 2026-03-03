@@ -34,6 +34,27 @@ interface SurveyOption {
     branching: unknown;
 }
 
+interface PersistedChildOption {
+    option: string;
+    order: number;
+    go_to: unknown;
+}
+
+interface PersistedChildQuestion {
+    question: string;
+    response_type: 'free-text' | 'multiple-choice';
+    allow_multiple: boolean;
+    order: number;
+    after_answer_go_to: unknown;
+    options?: PersistedChildOption[];
+}
+
+interface OptionBranchingMetadata {
+    next_question: unknown;
+    follow_up_after_children: unknown;
+    child_questions: PersistedChildQuestion[];
+}
+
 interface SurveyQuestion {
     id: number;
     question: string;
@@ -118,6 +139,68 @@ function formatBranching(branching: unknown): string {
     }
 
     return `Next: ${String(branching)}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null;
+}
+
+function parseOptionBranchingMetadata(branching: unknown): OptionBranchingMetadata | null {
+    if (!isRecord(branching)) {
+        return null;
+    }
+
+    const childQuestions = Array.isArray(branching.child_questions)
+        ? (branching.child_questions as PersistedChildQuestion[])
+        : [];
+
+    return {
+        next_question: branching.next_question ?? null,
+        follow_up_after_children: branching.follow_up_after_children ?? null,
+        child_questions: childQuestions,
+    };
+}
+
+function formatParentBranchingTarget(target: unknown): string {
+    if (target === null || target === undefined || target === '') {
+        return 'Not set';
+    }
+
+    const numericTarget = Number(target);
+    if (!Number.isNaN(numericTarget)) {
+        if (numericTarget === -1) {
+            return 'End Survey';
+        }
+
+        if (numericTarget === 0) {
+            return 'Next Question, if added';
+        }
+
+        return `Question ${numericTarget + 1}`;
+    }
+
+    return String(target);
+}
+
+function formatChildBranchingTarget(target: unknown, parentQuestionNumber: number): string {
+    if (target === null || target === undefined || target === '') {
+        return 'Not set';
+    }
+
+    const numericTarget = Number(target);
+    if (!Number.isNaN(numericTarget)) {
+        if (numericTarget === -1) {
+            return 'Exit Child Questions';
+        }
+
+        if (numericTarget === 0) {
+            return 'Next Question, if added';
+        }
+
+        return `Question ${parentQuestionNumber}.${numericTarget}`;
+    }
+
+    return String(target);
 }
 
 function buildEditState(question: SurveyQuestion): QuestionEditState {
@@ -567,14 +650,84 @@ export default function Show() {
                                                             .map((option, optionIndex) => (
                                                                 <div
                                                                     key={option.id}
-                                                                    className="flex items-center justify-between rounded-md border bg-white px-3 py-2"
+                                                                    className="space-y-3 rounded-md border bg-white px-3 py-2"
                                                                 >
-                                                                    <span className="text-sm">
-                                                                        {optionIndex + 1}. {option.option}
-                                                                    </span>
-                                                                    <Badge variant="outline">
-                                                                        {formatBranching(option.branching)}
-                                                                    </Badge>
+                                                                    <div className="flex items-center justify-between gap-2">
+                                                                        <span className="text-sm">
+                                                                            {optionIndex + 1}. {option.option}
+                                                                        </span>
+                                                                        <Badge variant="outline">
+                                                                            {formatBranching(option.branching)}
+                                                                        </Badge>
+                                                                    </div>
+
+                                                                    {(() => {
+                                                                        const optionBranchingMetadata = parseOptionBranchingMetadata(option.branching);
+                                                                        if (!optionBranchingMetadata || optionBranchingMetadata.child_questions.length === 0) {
+                                                                            return null;
+                                                                        }
+
+                                                                        const sortedChildQuestions = [...optionBranchingMetadata.child_questions]
+                                                                            .sort((first, second) => first.order - second.order);
+
+                                                                        return (
+                                                                            <div className="rounded-lg border border-violet-100 bg-violet-50/40 p-3">
+                                                                                <p className="text-xs font-semibold tracking-wide text-violet-700 uppercase">
+                                                                                    Child Questions ({sortedChildQuestions.length})
+                                                                                </p>
+
+                                                                                <div className="mt-2 space-y-2">
+                                                                                    {sortedChildQuestions.map((childQuestion, childQuestionIndex) => (
+                                                                                        <div
+                                                                                            key={`${option.id}-child-${childQuestionIndex}`}
+                                                                                            className="rounded-md border border-violet-100 bg-white p-3"
+                                                                                        >
+                                                                                            <p className="text-sm font-medium text-slate-900">
+                                                                                                Question {index + 1}.{childQuestionIndex + 1}
+                                                                                            </p>
+                                                                                            <p className="mt-1 text-sm text-slate-700">
+                                                                                                {childQuestion.question}
+                                                                                            </p>
+                                                                                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                                                                                                <Badge variant="outline">
+                                                                                                    {childQuestion.response_type}
+                                                                                                </Badge>
+                                                                                                <span>
+                                                                                                    After answer: {formatChildBranchingTarget(childQuestion.after_answer_go_to, index + 1)}
+                                                                                                </span>
+                                                                                            </div>
+
+                                                                                            {childQuestion.response_type === 'multiple-choice' && childQuestion.options && childQuestion.options.length > 0 ? (
+                                                                                                <div className="mt-2 space-y-1">
+                                                                                                    {childQuestion.options
+                                                                                                        .sort((first, second) => first.order - second.order)
+                                                                                                        .map((childOption, childOptionIndex) => (
+                                                                                                            <div
+                                                                                                                key={`${option.id}-child-${childQuestionIndex}-option-${childOptionIndex}`}
+                                                                                                                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs"
+                                                                                                            >
+                                                                                                                <span>
+                                                                                                                    {childOptionIndex + 1}. {childOption.option}
+                                                                                                                </span>
+                                                                                                                <span className="text-slate-500">
+                                                                                                                    Go to: {formatChildBranchingTarget(childOption.go_to, index + 1)}
+                                                                                                                </span>
+                                                                                                            </div>
+                                                                                                        ))}
+                                                                                                </div>
+                                                                                            ) : null}
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+
+                                                                                <div className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                                                                                    After all child questions:
+                                                                                    {' '}
+                                                                                    {formatParentBranchingTarget(optionBranchingMetadata.follow_up_after_children)}
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })()}
                                                                 </div>
                                                             ))
                                                     ) : (

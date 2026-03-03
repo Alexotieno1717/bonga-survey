@@ -112,6 +112,89 @@ test('authenticated user can save survey as draft without recipients or schedule
     expect($survey->contacts()->count())->toBe(0);
 });
 
+test('survey stores option child-question flow and branching metadata', function (): void {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
+
+    $user = User::factory()->create();
+
+    $response = $this
+        ->actingAs($user)
+        ->post(route('questions.store'), [
+            'status' => 'draft',
+            'surveyName' => 'Branching Child Flow Survey',
+            'description' => 'Survey with child question definitions',
+            'startDate' => '2026-02-24',
+            'endDate' => '2026-03-24',
+            'triggerWord' => 'CHILD-FLOW-2026',
+            'completionMessage' => null,
+            'invitationMessage' => null,
+            'scheduleTime' => null,
+            'questions' => [
+                [
+                    'question' => 'Choose your preferred service',
+                    'responseType' => 'multiple-choice',
+                    'options' => ['Internet', 'Voice'],
+                    'allowMultiple' => false,
+                    'branching' => [1, -1],
+                    'childQuestionStates' => [
+                        [
+                            'followUpBranching' => 1,
+                            'childQuestions' => [
+                                [
+                                    'question' => 'Why do you prefer Internet?',
+                                    'responseType' => 'free-text',
+                                    'branching' => -1,
+                                    'allowMultiple' => false,
+                                    'isSaved' => true,
+                                ],
+                            ],
+                        ],
+                        null,
+                    ],
+                ],
+                [
+                    'question' => 'Any other feedback?',
+                    'responseType' => 'free-text',
+                    'allowMultiple' => false,
+                    'branching' => -1,
+                ],
+            ],
+            'recipients' => [],
+        ]);
+
+    $response->assertRedirect(route('questions.index'));
+
+    $survey = Survey::query()->where('trigger_word', 'CHILD-FLOW-2026')->first();
+    expect($survey)->not->toBeNull();
+
+    if ($survey === null) {
+        return;
+    }
+
+    $firstQuestion = $survey->questions()->orderBy('order')->first();
+    expect($firstQuestion)->not->toBeNull();
+
+    if ($firstQuestion === null) {
+        return;
+    }
+
+    $firstOption = $firstQuestion->options()->orderBy('order')->first();
+    expect($firstOption)->not->toBeNull();
+
+    if ($firstOption === null) {
+        return;
+    }
+
+    $optionBranching = $firstOption->branching;
+
+    expect($optionBranching)->toBeArray();
+    expect($optionBranching['next_question'] ?? null)->toBe(1);
+    expect($optionBranching['follow_up_after_children'] ?? null)->toBe(1);
+    expect($optionBranching['child_questions'] ?? null)->toBeArray();
+    expect($optionBranching['child_questions'][0]['question'] ?? null)->toBe('Why do you prefer Internet?');
+    expect($optionBranching['child_questions'][0]['after_answer_go_to'] ?? null)->toBe(-1);
+});
+
 test('user cannot create a survey using recipients from another account', function (): void {
     $this->withoutMiddleware(ValidateCsrfToken::class);
 
