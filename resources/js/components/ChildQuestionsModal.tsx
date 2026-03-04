@@ -1,6 +1,6 @@
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { Trash2, TriangleAlert, X } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 
 export interface ChildQuestionDraft {
@@ -56,12 +56,6 @@ export default function ChildQuestionsModal({
     availableTargets,
 }: ChildQuestionsModalProps) {
     const [localState, setLocalState] = useState<ChildQuestionOptionState>(initialState);
-
-    useEffect(() => {
-        if (isOpen) {
-            setLocalState(initialState);
-        }
-    }, [initialState, isOpen]);
 
     const nextChildId = (): number => {
         if (localState.childQuestions.length === 0) {
