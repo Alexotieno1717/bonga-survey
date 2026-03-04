@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Survey\CreateSurvey;
 use App\Http\Requests\Survey\StoreSurveyRequest;
+use App\Http\Requests\Survey\UpdateSurveyDetailsRequest;
 use App\Http\Requests\Survey\UpdateSurveyQuestionRequest;
 use App\Models\Contact;
 use App\Models\ContactGroup;
@@ -112,6 +113,103 @@ class SurveyController extends Controller
         ]);
     }
 
+    public function updateDetails(
+        UpdateSurveyDetailsRequest $request,
+        Survey $survey,
+    ): RedirectResponse {
+        $survey = Survey::query()
+            ->whereKey($survey->id)
+            ->where('created_by', Auth::id())
+            ->firstOrFail();
+
+        if ($survey->status !== 'draft') {
+            abort(403, 'Only draft surveys can be edited.');
+        }
+
+        $validated = $request->validated();
+
+        $survey->update([
+            'name' => (string) $validated['surveyName'],
+            'description' => (string) $validated['description'],
+            'start_date' => (string) $validated['startDate'],
+            'end_date' => (string) $validated['endDate'],
+            'trigger_word' => (string) $validated['triggerWord'],
+            'invitation_message' => isset($validated['invitationMessage'])
+                ? (string) $validated['invitationMessage']
+                : null,
+            'completion_message' => isset($validated['completionMessage'])
+                ? (string) $validated['completionMessage']
+                : null,
+            'scheduled_time' => isset($validated['scheduleTime']) && $validated['scheduleTime'] !== ''
+                ? (string) $validated['scheduleTime']
+                : null,
+        ]);
+
+        return redirect()
+            ->route('surveys.show', $survey)
+            ->with('success', 'Survey details updated successfully.');
+    }
+
+    public function storeQuestion(
+        UpdateSurveyQuestionRequest $request,
+        Survey $survey,
+    ): RedirectResponse {
+        $survey = Survey::query()
+            ->whereKey($survey->id)
+            ->where('created_by', Auth::id())
+            ->firstOrFail();
+
+        if ($survey->status !== 'draft') {
+            abort(403, 'Only draft surveys can be edited.');
+        }
+
+        $validated = $request->validated();
+        $responseType = (string) $validated['response_type'];
+        $branchingTarget = $validated['branching'] ?? null;
+        $normalizedBranching = null;
+
+        if ($branchingTarget !== null && $branchingTarget !== '') {
+            if (is_array($branchingTarget)) {
+                $normalizedBranching = $branchingTarget;
+            } elseif (is_numeric($branchingTarget)) {
+                $normalizedBranching = ['next_question' => (int) $branchingTarget];
+            }
+        }
+
+        $nextOrder = ((int) ($survey->questions()->max('order') ?? -1)) + 1;
+
+        $question = $survey->questions()->create([
+            'question' => (string) $validated['question'],
+            'response_type' => $responseType,
+            'allow_multiple' => $responseType === 'multiple-choice' && (bool) ($validated['allow_multiple'] ?? false),
+            'free_text_description' => $responseType === 'free-text'
+                ? (string) ($validated['free_text_description'] ?? '')
+                : null,
+            'order' => $nextOrder,
+            'branching' => $normalizedBranching,
+        ]);
+
+        if ($responseType === 'multiple-choice') {
+            $options = collect((array) ($validated['options'] ?? []))
+                ->pluck('option')
+                ->map(fn (mixed $value): string => trim((string) $value))
+                ->filter()
+                ->values();
+
+            foreach ($options as $index => $optionText) {
+                $question->options()->create([
+                    'option' => $optionText,
+                    'order' => $index,
+                    'branching' => null,
+                ]);
+            }
+        }
+
+        return redirect()
+            ->route('surveys.show', $survey)
+            ->with('success', 'Question added successfully.');
+    }
+
     public function updateQuestion(
         UpdateSurveyQuestionRequest $request,
         Survey $survey,
@@ -126,12 +224,8 @@ class SurveyController extends Controller
             ->whereKey($question->id)
             ->firstOrFail();
 
-        $hasPublishedRecipients = $survey->contacts()
-            ->whereNotNull('contact_survey.sent_at')
-            ->exists();
-
-        if ($survey->status !== 'draft' || $hasPublishedRecipients) {
-            abort(403, 'Only unpublished draft surveys can be edited.');
+        if ($survey->status !== 'draft') {
+            abort(403, 'Only draft surveys can be edited.');
         }
 
         $validated = $request->validated();

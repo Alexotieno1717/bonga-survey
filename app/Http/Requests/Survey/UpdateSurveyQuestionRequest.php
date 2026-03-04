@@ -24,6 +24,7 @@ class UpdateSurveyQuestionRequest extends FormRequest
             'response_type' => ['required', Rule::in(['free-text', 'multiple-choice'])],
             'free_text_description' => ['nullable', 'string'],
             'allow_multiple' => ['sometimes', 'boolean'],
+            'branching' => ['nullable'],
             'options' => ['nullable', 'array'],
             'options.*.option' => ['nullable', 'string', 'max:255'],
         ];

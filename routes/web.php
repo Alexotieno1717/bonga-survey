@@ -21,6 +21,8 @@ Route::post('surveys/question', [SurveyController::class, 'store'])->name('quest
 // Route::get('surveys/question/{question}', [SurveyController::class, 'show'])->name('questions.show')->middleware(['auth']);
 Route::get('surveys/responses', [SurveyController::class, 'responsesIndex'])->middleware(['auth'])->name('surveys.responses.index');
 Route::get('surveys/{survey}', [SurveyController::class, 'show'])->middleware(['auth'])->name('surveys.show');
+Route::put('surveys/{survey}', [SurveyController::class, 'updateDetails'])->middleware(['auth'])->name('surveys.update');
+Route::post('surveys/{survey}/questions', [SurveyController::class, 'storeQuestion'])->middleware(['auth'])->name('surveys.questions.store');
 Route::put('surveys/{survey}/questions/{question}', [SurveyController::class, 'updateQuestion'])->middleware(['auth'])->name('surveys.questions.update');
 Route::patch('surveys/{survey}/cancel', [SurveyController::class, 'cancel'])->middleware(['auth'])->name('surveys.cancel');
 Route::patch('surveys/{survey}/reactivate', [SurveyController::class, 'reactivate'])->middleware(['auth'])->name('surveys.reactivate');

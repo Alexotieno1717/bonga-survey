@@ -421,6 +421,148 @@ test('survey owner can edit a question from survey details page', function (): v
     ]);
 });
 
+test('survey owner can add a new question from survey details page when survey is draft', function (): void {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
+
+    $owner = User::factory()->create();
+    $survey = Survey::query()->create([
+        'name' => 'Survey Add Question Draft',
+        'description' => 'Draft survey for adding question',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDays(7)->toDateString(),
+        'trigger_word' => 'ADD-QUESTION-DRAFT',
+        'completion_message' => null,
+        'invitation_message' => 'Reply START',
+        'scheduled_time' => now()->addDay(),
+        'status' => 'draft',
+        'created_by' => $owner->id,
+    ]);
+
+    $response = $this->actingAs($owner)->post(route('surveys.questions.store', $survey), [
+        'question' => 'What is your preferred channel?',
+        'response_type' => 'multiple-choice',
+        'allow_multiple' => false,
+        'branching' => -1,
+        'options' => [
+            ['option' => 'SMS'],
+            ['option' => 'WhatsApp'],
+        ],
+    ]);
+
+    $response->assertRedirect(route('surveys.show', $survey));
+
+    $newQuestion = $survey->fresh()?->questions()->orderByDesc('order')->first();
+    expect($newQuestion)->not->toBeNull();
+
+    if ($newQuestion === null) {
+        return;
+    }
+
+    expect($newQuestion->question)->toBe('What is your preferred channel?');
+    expect($newQuestion->response_type)->toBe('multiple-choice');
+    expect($newQuestion->options()->count())->toBe(2);
+    expect($newQuestion->branching)->toBeArray();
+    expect($newQuestion->branching['next_question'] ?? null)->toBe(-1);
+});
+
+test('active survey cannot have new questions added', function (): void {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
+
+    $owner = User::factory()->create();
+    $survey = Survey::query()->create([
+        'name' => 'Active Survey Add Question Locked',
+        'description' => 'Active survey should be locked',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDays(7)->toDateString(),
+        'trigger_word' => 'ADD-QUESTION-ACTIVE',
+        'completion_message' => null,
+        'invitation_message' => 'Reply START',
+        'scheduled_time' => now(),
+        'status' => 'active',
+        'created_by' => $owner->id,
+    ]);
+
+    $response = $this->actingAs($owner)->post(route('surveys.questions.store', $survey), [
+        'question' => 'Attempted question on active survey',
+        'response_type' => 'free-text',
+        'free_text_description' => 'Attempted',
+    ]);
+
+    $response->assertForbidden();
+    expect($survey->fresh()?->questions()->count())->toBe(0);
+});
+
+test('survey owner can update survey details when survey is draft', function (): void {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
+
+    $owner = User::factory()->create();
+    $survey = Survey::query()->create([
+        'name' => 'Original Draft Survey Name',
+        'description' => 'Original draft description',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDays(7)->toDateString(),
+        'trigger_word' => 'ORIGINAL-DRAFT-TRIGGER',
+        'completion_message' => 'Original completion',
+        'invitation_message' => 'Original invitation',
+        'scheduled_time' => now()->addDay(),
+        'status' => 'draft',
+        'created_by' => $owner->id,
+    ]);
+
+    $response = $this->actingAs($owner)->put(route('surveys.update', $survey), [
+        'surveyName' => 'Updated Draft Survey Name',
+        'description' => 'Updated draft description',
+        'startDate' => now()->addDay()->toDateString(),
+        'endDate' => now()->addDays(10)->toDateString(),
+        'triggerWord' => 'UPDATED-DRAFT-TRIGGER',
+        'invitationMessage' => 'Updated invitation message',
+        'completionMessage' => 'Updated completion message',
+        'scheduleTime' => now()->addDays(2)->format('Y-m-d H:i:s'),
+    ]);
+
+    $response->assertRedirect(route('surveys.show', $survey));
+
+    $survey->refresh();
+
+    expect($survey->name)->toBe('Updated Draft Survey Name');
+    expect($survey->description)->toBe('Updated draft description');
+    expect($survey->trigger_word)->toBe('UPDATED-DRAFT-TRIGGER');
+    expect($survey->invitation_message)->toBe('Updated invitation message');
+    expect($survey->completion_message)->toBe('Updated completion message');
+});
+
+test('active survey details cannot be edited', function (): void {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
+
+    $owner = User::factory()->create();
+    $survey = Survey::query()->create([
+        'name' => 'Locked Active Survey',
+        'description' => 'Active surveys should be locked',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDays(7)->toDateString(),
+        'trigger_word' => 'LOCKED-ACTIVE-TRIGGER',
+        'completion_message' => null,
+        'invitation_message' => 'Reply START',
+        'scheduled_time' => now(),
+        'status' => 'active',
+        'created_by' => $owner->id,
+    ]);
+
+    $response = $this->actingAs($owner)->put(route('surveys.update', $survey), [
+        'surveyName' => 'Attempted Active Update',
+        'description' => 'Attempted update',
+        'startDate' => now()->toDateString(),
+        'endDate' => now()->addDays(3)->toDateString(),
+        'triggerWord' => 'ATTEMPTED-ACTIVE-UPDATE',
+        'invitationMessage' => 'Attempted invitation',
+        'completionMessage' => 'Attempted completion',
+        'scheduleTime' => now()->addHour()->format('Y-m-d H:i:s'),
+    ]);
+
+    $response->assertForbidden();
+    expect($survey->refresh()->name)->toBe('Locked Active Survey');
+});
+
 test('survey owner can delete survey from survey details page', function (): void {
     $this->withoutMiddleware(ValidateCsrfToken::class);
 
@@ -578,12 +720,13 @@ test('scheduled published survey stays draft until start date then becomes activ
     expect($survey->contacts()->whereNotNull('contact_survey.sent_at')->count())->toBe(1);
 
     $question = $survey->questions()->firstOrFail();
-    $lockedEditResponse = $this->actingAs($user)->put(route('surveys.questions.update', [$survey, $question]), [
-        'question' => 'Attempted update while scheduled',
+    $draftEditResponse = $this->actingAs($user)->put(route('surveys.questions.update', [$survey, $question]), [
+        'question' => 'Updated while still draft',
         'response_type' => 'free-text',
-        'free_text_description' => 'Attempted',
+        'free_text_description' => 'Updated while draft',
     ]);
-    $lockedEditResponse->assertForbidden();
+    $draftEditResponse->assertRedirect(route('surveys.show', $survey));
+    expect($question->fresh()->question)->toBe('Updated while still draft');
 
     Carbon::setTestNow('2026-03-01 12:00:00');
     $this->artisan('surveys:sync-statuses')->assertSuccessful();

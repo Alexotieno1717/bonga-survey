@@ -4,7 +4,7 @@ import { Search } from 'lucide-react';
 import NotFound from '@/components/NotFound';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
-import questions from '@/routes/questions';
+ import questions from '@/routes/questions';
 import surveysRoutes from '@/routes/surveys';
 import type { BreadcrumbItem } from '@/types';
 
