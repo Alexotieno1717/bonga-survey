@@ -1,5 +1,10 @@
-import { ErrorMessage, Field } from 'formik';
-import type { FormValues, SetFieldValue } from '@/components/survey/create/types';
+import type {
+    FormValues,
+    GetFieldError,
+    IsFieldTouched,
+    SetFieldTouched,
+    SetFieldValue,
+} from '@/components/survey/create/types';
 import { surveyTextareaClassName } from '@/components/survey/SurveyField';
 import SurveySectionCard from '@/components/survey/SurveySectionCard';
 import SurveyStepIntroCard from '@/components/survey/SurveyStepIntroCard';
@@ -9,12 +14,22 @@ import { cn } from '@/lib/utils';
 interface SurveyOutroStepProps {
     values: FormValues;
     setFieldValue: SetFieldValue;
+    setFieldTouched: SetFieldTouched;
+    getFieldError: GetFieldError;
+    isFieldTouched: IsFieldTouched;
 }
 
 export default function SurveyOutroStep({
     values,
     setFieldValue,
+    setFieldTouched,
+    getFieldError,
+    isFieldTouched,
 }: SurveyOutroStepProps) {
+    const completionMessageError = isFieldTouched('completionMessage')
+        ? getFieldError('completionMessage')
+        : undefined;
+
     return (
         <div className="space-y-6">
             <SurveyStepIntroCard
@@ -30,20 +45,26 @@ export default function SurveyOutroStep({
                     </span>
                 </div>
 
-                <Field
-                    as="textarea"
+                <textarea
                     name="completionMessage"
                     placeholder="E.g. Thank you for taking the time to complete our survey! Your feedback is invaluable to us and helps us improve."
                     className={cn(surveyTextareaClassName, 'min-h-[120px] rounded-xl')}
                     rows={4}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                    value={values.completionMessage}
+                    onBlur={() => {
+                        setFieldTouched('completionMessage', true);
+                    }}
+                    onChange={(event) => {
                         if (values.isCompletionMessageSaved) {
                             setFieldValue('isCompletionMessageSaved', false);
                         }
-                        setFieldValue('completionMessage', e.target.value);
+                        setFieldValue('completionMessage', event.target.value);
                     }}
                 />
-                <ErrorMessage name="completionMessage" component="div" className="pt-2 text-xs text-red-500" />
+
+                {completionMessageError ? (
+                    <div className="pt-2 text-xs text-red-500">{completionMessageError}</div>
+                ) : null}
 
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-xs text-slate-500">

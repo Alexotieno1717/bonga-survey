@@ -1,12 +1,14 @@
-import { Field } from 'formik';
 import { cn } from '@/lib/utils';
 
 interface SurveyBranchingSelectProps {
-    name: string;
+    name?: string;
     currentQuestionIndex: number;
     questionCount: number;
     noMoreLabel: string;
     className?: string;
+    value: string;
+    onChange: (value: string) => void;
+    onBlur?: () => void;
 }
 
 export default function SurveyBranchingSelect({
@@ -15,11 +17,18 @@ export default function SurveyBranchingSelect({
     questionCount,
     noMoreLabel,
     className,
+    value,
+    onChange,
+    onBlur,
 }: SurveyBranchingSelectProps) {
     return (
-        <Field
-            as="select"
+        <select
             name={name}
+            value={value}
+            onChange={(event) => {
+                onChange(event.target.value);
+            }}
+            onBlur={onBlur}
             className={cn(
                 'h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none',
                 className,
@@ -43,6 +52,6 @@ export default function SurveyBranchingSelect({
                 {noMoreLabel}
             </option>
             <option value="-1">End Survey</option>
-        </Field>
+        </select>
     );
 }

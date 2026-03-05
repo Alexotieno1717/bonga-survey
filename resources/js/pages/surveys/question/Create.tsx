@@ -1,9 +1,6 @@
-import type { RequestPayload } from '@inertiajs/core';
 import type { PageProps as InertiaPageProps } from '@inertiajs/core';
-import { Head, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { format } from 'date-fns';
-import type { FormikErrors, FormikHelpers, FormikTouched } from 'formik';
-import { Form, Formik } from 'formik';
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import type { ChildQuestionOptionState } from '@/components/ChildQuestionsModal';
@@ -15,6 +12,10 @@ import {
 } from '@/components/survey/create/constants';
 import { getCurrentDateTimeLocalValue } from '@/components/survey/create/create-utils';
 import {
+    normalizeFieldPath,
+    setValueAtPath,
+} from '@/components/survey/create/form-path';
+import {
     handleRecipientFileUpload,
 } from '@/components/survey/create/recipients';
 import {
@@ -22,14 +23,24 @@ import {
     isSurveyCreateStep0Complete,
     isSurveyCreateStep1Complete,
 } from '@/components/survey/create/step-logic';
-import { submitSurveyPayload } from '@/components/survey/create/submit';
 import { buildSurveyPayload } from '@/components/survey/create/survey-payload';
 import SurveyCreateFooterActions from '@/components/survey/create/SurveyCreateFooterActions';
 import SurveyCreateStepContent from '@/components/survey/create/SurveyCreateStepContent';
 import SurveyCreateTabs from '@/components/survey/create/SurveyCreateTabs';
-import type { Contact, FormValues, SetFieldValue } from '@/components/survey/create/types';
-import { buildSurveyCreateValidationSchema } from '@/components/survey/create/validation';
+import type {
+    Contact,
+    FormErrors,
+    FormTouched,
+    FormValues,
+    SetFieldTouched,
+    SetFieldValue,
+} from '@/components/survey/create/types';
+import {
+    filterValidationErrorsByFields,
+    validateSurveyCreateValues,
+} from '@/components/survey/create/validation';
 import AppLayout from '@/layouts/app-layout';
+import questions from '@/routes/questions';
 
 interface PageProps extends InertiaPageProps {
     contacts: Contact[];
@@ -40,6 +51,8 @@ interface PageProps extends InertiaPageProps {
     existingTriggerWords: string[];
 }
 
+const detailsStepFields = ['surveyName', 'description', 'startDate', 'endDate', 'shortCode', 'triggerWord'];
+
 export default function Create() {
     const [currentStep, setCurrentStep] = useState<number>(0);
     const [sendSurveyStep, setSendSurveyStep] = useState<number>(0);
@@ -47,8 +60,18 @@ export default function Create() {
     const [uploadedRecipientFileName, setUploadedRecipientFileName] = useState('');
     const [isParsingRecipientsFile, setIsParsingRecipientsFile] = useState(false);
     const [childQuestionStates, setChildQuestionStates] = useState<Record<string, ChildQuestionOptionState>>({});
+    const [clientErrors, setClientErrors] = useState<FormErrors>({});
+    const [touchedFields, setTouchedFields] = useState<FormTouched>({});
 
     const { contacts, existingTriggerWords } = usePage<PageProps>().props;
+    const {
+        data,
+        errors,
+        post,
+        processing,
+        setData,
+        transform,
+    } = useForm<FormValues>(surveyCreateInitialValues);
 
     const normalizeTriggerWord = (value: string): string => value.trim().toLowerCase();
     const isTriggerWordUnique = (value: string): boolean => {
@@ -61,28 +84,155 @@ export default function Create() {
         return !existingTriggerWords.includes(normalizedValue);
     };
 
-    const validationSchema = buildSurveyCreateValidationSchema(existingTriggerWords, surveyCreateToday);
+    const normalizeFieldErrors = (inputErrors: Record<string, unknown>): FormErrors => {
+        return Object.entries(inputErrors).reduce<FormErrors>((normalizedErrors, [field, message]) => {
+            if (typeof message !== 'string') {
+                return normalizedErrors;
+            }
 
-    const handleSubmit = async (
-        values: FormValues,
-        { setSubmitting }: FormikHelpers<FormValues>,
-    ): Promise<void> => {
-        try {
-            const payload = buildSurveyPayload({
-                values,
-                childQuestionStates,
-                formattedStartDate: values.startDate ? format(values.startDate, 'yyyy-MM-dd') : '',
-                formattedEndDate: values.endDate ? format(values.endDate, 'yyyy-MM-dd') : '',
-                scheduleTime: values.scheduleMode === 'now'
-                    ? getCurrentDateTimeLocalValue()
-                    : values.scheduleTime,
+            normalizedErrors[normalizeFieldPath(field)] = message;
+
+            return normalizedErrors;
+        }, {});
+    };
+
+    const mergeStepErrors = (stepFields: string[], stepErrors: FormErrors): void => {
+        const normalizedStepFields = stepFields.map((field) => normalizeFieldPath(field));
+
+        setClientErrors((previousErrors) => {
+            const nextErrors: FormErrors = {};
+
+            Object.entries(previousErrors).forEach(([field, message]) => {
+                const isStepField = normalizedStepFields.some((stepField) => {
+                    return field === stepField || field.startsWith(`${stepField}.`);
+                });
+
+                if (!isStepField) {
+                    nextErrors[field] = message;
+                }
             });
 
-            submitSurveyPayload({
-                payload: payload as RequestPayload,
-                submissionAction: values.submissionAction,
+            return {
+                ...nextErrors,
+                ...stepErrors,
+            };
+        });
+    };
+
+    const setFieldTouched: SetFieldTouched = (field, touched = true) => {
+        const normalizedField = normalizeFieldPath(field);
+
+        setTouchedFields((previousTouched) => {
+            return {
+                ...previousTouched,
+                [normalizedField]: touched,
+            };
+        });
+    };
+
+    const markFieldsTouched = (fields: string[]): void => {
+        const normalizedTouchedFields = fields.map((field) => normalizeFieldPath(field));
+
+        setTouchedFields((previousTouched) => {
+            const nextTouched = { ...previousTouched };
+
+            normalizedTouchedFields.forEach((field) => {
+                nextTouched[field] = true;
+            });
+
+            return nextTouched;
+        });
+    };
+
+    const getFieldError = (field: string): string | undefined => {
+        const normalizedField = normalizeFieldPath(field);
+        const normalizedServerErrors = normalizeFieldErrors(errors as Record<string, unknown>);
+
+        return clientErrors[normalizedField] ?? normalizedServerErrors[normalizedField];
+    };
+
+    const isFieldTouched = (field: string): boolean => {
+        return Boolean(touchedFields[normalizeFieldPath(field)]);
+    };
+
+    const setFieldValue: SetFieldValue = (field, value) => {
+        const normalizedField = normalizeFieldPath(field);
+
+        setData((previousValues) => {
+            return setValueAtPath(previousValues, field, value);
+        });
+
+        setClientErrors((previousErrors) => {
+            if (!previousErrors[normalizedField]) {
+                return previousErrors;
+            }
+
+            const nextErrors = { ...previousErrors };
+            delete nextErrors[normalizedField];
+
+            return nextErrors;
+        });
+    };
+
+    const validateStep = (stepFields: string[]): boolean => {
+        markFieldsTouched(stepFields);
+
+        const allErrors = validateSurveyCreateValues(data, existingTriggerWords, surveyCreateToday);
+        const stepErrors = filterValidationErrorsByFields(allErrors, stepFields);
+        mergeStepErrors(stepFields, stepErrors);
+
+        return Object.keys(stepErrors).length === 0;
+    };
+
+    const validateDetailsStep = (): boolean => {
+        return validateStep(detailsStepFields);
+    };
+
+    const validateQuestionsStep = (): boolean => {
+        const questionStepFields = data.questions.map((_, questionIndex) => `questions.${questionIndex}`);
+
+        return validateStep(questionStepFields);
+    };
+
+    const submitForm = (): void => {
+        try {
+            const payload = buildSurveyPayload({
+                values: data,
+                childQuestionStates,
+                formattedStartDate: data.startDate ? format(data.startDate, 'yyyy-MM-dd') : '',
+                formattedEndDate: data.endDate ? format(data.endDate, 'yyyy-MM-dd') : '',
+                scheduleTime: data.scheduleMode === 'now'
+                    ? getCurrentDateTimeLocalValue()
+                    : data.scheduleTime,
+            });
+
+            transform(() => payload as unknown as FormValues);
+            post(questions.store().url, {
+                onSuccess: () => {
+                    toast.success(
+                        data.submissionAction === 'active'
+                            ? 'Survey published successfully!'
+                            : 'Survey saved as draft successfully!',
+                        {
+                            position: 'top-center',
+                            richColors: true,
+                        },
+                    );
+                    router.visit(questions.index().url);
+                },
+                onError: (validationErrors) => {
+                    markFieldsTouched(Object.keys(validationErrors));
+                    console.error('Validation errors:', validationErrors);
+                    toast.error(
+                        'Failed to create survey. Please check your inputs.',
+                        {
+                            position: 'top-center',
+                            richColors: true,
+                        },
+                    );
+                },
                 onFinish: () => {
-                    setSubmitting(false);
+                    transform((previousValues) => previousValues);
                 },
             });
         } catch (error) {
@@ -91,7 +241,6 @@ export default function Create() {
                 position: 'top-center',
                 richColors: true,
             });
-            setSubmitting(false);
         }
     };
 
@@ -99,125 +248,106 @@ export default function Create() {
         <AppLayout>
             <Head title="Create Surveys Questions" />
             <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-                <Formik
-                    initialValues={surveyCreateInitialValues}
-                    onSubmit={handleSubmit}
-                    validationSchema={validationSchema}
-                >
-                    {({
-                        values,
-                        validateField,
-                        touched,
-                        setTouched,
-                        errors,
-                        setFieldValue,
-                        submitForm,
-                        isSubmitting,
-                    }) => {
-                        return (
-                            <>
-                                <SurveyCreateTabs
-                                    currentStep={currentStep}
-                                    questionCount={values.questions.length}
-                                    isStep0Complete={isSurveyCreateStep0Complete(values, isTriggerWordUnique)}
-                                    isStep1Complete={isSurveyCreateStep1Complete(values)}
-                                    isStep2Complete={true}
-                                />
+                <SurveyCreateTabs
+                    currentStep={currentStep}
+                    questionCount={data.questions.length}
+                    isStep0Complete={isSurveyCreateStep0Complete(data, isTriggerWordUnique)}
+                    isStep1Complete={isSurveyCreateStep1Complete(data)}
+                    isStep2Complete={true}
+                />
 
-                                {currentStep === 3 ? (
-                                    <StepNavigation
-                                        steps={surveyCreateSteps}
-                                        currentStep={sendSurveyStep}
-                                        onStepClick={(step) =>
-                                            setSendSurveyStep(step)
-                                        }
-                                    />
-                                ) : null}
+                {currentStep === 3 ? (
+                    <StepNavigation
+                        steps={surveyCreateSteps}
+                        currentStep={sendSurveyStep}
+                        onStepClick={(step) =>
+                            setSendSurveyStep(step)
+                        }
+                    />
+                ) : null}
 
-                                <Form className="bg-white">
-                                    <SurveyCreateStepContent
-                                        currentStep={currentStep}
-                                        sendSurveyStep={sendSurveyStep}
-                                        values={values}
-                                        errors={errors as FormikErrors<FormValues>}
-                                        touched={touched as FormikTouched<FormValues>}
-                                        setFieldValue={setFieldValue as SetFieldValue}
-                                        contacts={contacts}
-                                        today={surveyCreateToday}
-                                        recipientInputMode={recipientInputMode}
-                                        setRecipientInputMode={setRecipientInputMode}
-                                        isParsingRecipientsFile={isParsingRecipientsFile}
-                                        uploadedRecipientFileName={uploadedRecipientFileName}
-                                        onRecipientFileUpload={async (
-                                            event,
-                                            innerSetFieldValue,
-                                        ) => {
-                                            await handleRecipientFileUpload({
-                                                event,
-                                                setFieldValue: innerSetFieldValue,
-                                                setUploadedRecipientFileName,
-                                                setIsParsingRecipientsFile,
-                                            });
-                                        }}
-                                        childQuestionStates={childQuestionStates}
-                                        setChildQuestionStates={setChildQuestionStates}
-                                    />
-
-                                    <SurveyCreateFooterActions
-                                        currentStep={currentStep}
-                                        sendSurveyStep={sendSurveyStep}
-                                        isSubmitting={isSubmitting}
-                                        onBack={() => {
-                                            if (currentStep === 3 && sendSurveyStep > 0) {
-                                                setSendSurveyStep(sendSurveyStep - 1);
-                                            } else {
-                                                setCurrentStep(currentStep - 1);
-                                            }
-                                        }}
-                                        onSaveAsDraft={async () => {
-                                            await setFieldValue('submissionAction', 'draft');
-                                            submitForm();
-                                        }}
-                                        onPublish={async () => {
-                                            await setFieldValue('submissionAction', 'active');
-
-                                            handleSurveyNextStep({
-                                                currentStep,
-                                                sendSurveyStep,
-                                                values,
-                                                validateField,
-                                                setTouched,
-                                                errors,
-                                                submitForm,
-                                                isTriggerWordUnique,
-                                                setCurrentStep,
-                                                setSendSurveyStep,
-                                            });
-                                        }}
-                                        onNext={async () => {
-                                            if (currentStep === 0) {
-                                                await setFieldValue('submissionAction', 'draft');
-                                            }
-
-                                            handleSurveyNextStep({
-                                                currentStep,
-                                                sendSurveyStep,
-                                                values,
-                                                validateField,
-                                                setTouched,
-                                                errors,
-                                                submitForm,
-                                                isTriggerWordUnique,
-                                                setCurrentStep,
-                                                setSendSurveyStep,
-                                            });
-                                        }}
-                                    />
-                                </Form>
-                            </>
-                        );
+                <form
+                    className="bg-white"
+                    onSubmit={(event) => {
+                        event.preventDefault();
                     }}
-                </Formik>
+                >
+                    <SurveyCreateStepContent
+                        currentStep={currentStep}
+                        sendSurveyStep={sendSurveyStep}
+                        values={data}
+                        getFieldError={getFieldError}
+                        isFieldTouched={isFieldTouched}
+                        setFieldValue={setFieldValue}
+                        setFieldTouched={setFieldTouched}
+                        contacts={contacts}
+                        today={surveyCreateToday}
+                        recipientInputMode={recipientInputMode}
+                        setRecipientInputMode={setRecipientInputMode}
+                        isParsingRecipientsFile={isParsingRecipientsFile}
+                        uploadedRecipientFileName={uploadedRecipientFileName}
+                        onRecipientFileUpload={async (
+                            event,
+                            innerSetFieldValue,
+                        ) => {
+                            await handleRecipientFileUpload({
+                                event,
+                                setFieldValue: innerSetFieldValue,
+                                setUploadedRecipientFileName,
+                                setIsParsingRecipientsFile,
+                            });
+                        }}
+                        childQuestionStates={childQuestionStates}
+                        setChildQuestionStates={setChildQuestionStates}
+                    />
+
+                    <SurveyCreateFooterActions
+                        currentStep={currentStep}
+                        sendSurveyStep={sendSurveyStep}
+                        isSubmitting={processing}
+                        onBack={() => {
+                            if (currentStep === 3 && sendSurveyStep > 0) {
+                                setSendSurveyStep(sendSurveyStep - 1);
+                            } else {
+                                setCurrentStep(currentStep - 1);
+                            }
+                        }}
+                        onSaveAsDraft={async () => {
+                            setFieldValue('submissionAction', 'draft');
+                            submitForm();
+                        }}
+                        onPublish={async () => {
+                            setFieldValue('submissionAction', 'active');
+
+                            handleSurveyNextStep({
+                                currentStep,
+                                sendSurveyStep,
+                                values: data,
+                                validateDetailsStep,
+                                validateQuestionsStep,
+                                submitForm,
+                                setCurrentStep,
+                                setSendSurveyStep,
+                            });
+                        }}
+                        onNext={async () => {
+                            if (currentStep === 0) {
+                                setFieldValue('submissionAction', 'draft');
+                            }
+
+                            handleSurveyNextStep({
+                                currentStep,
+                                sendSurveyStep,
+                                values: data,
+                                validateDetailsStep,
+                                validateQuestionsStep,
+                                submitForm,
+                                setCurrentStep,
+                                setSendSurveyStep,
+                            });
+                        }}
+                    />
+                </form>
             </div>
         </AppLayout>
     );

@@ -1,4 +1,3 @@
-import type { FormikErrors, FormikTouched } from 'formik';
 import React from 'react';
 import type { ChildQuestionOptionState } from '@/components/ChildQuestionsModal';
 import AddRecipientsStep from '@/components/survey/create/AddRecipientsStep';
@@ -8,15 +7,23 @@ import ReviewAndSendStep from '@/components/survey/create/ReviewAndSendStep';
 import ReviewRecipientsStep from '@/components/survey/create/ReviewRecipientsStep';
 import SurveyDetailsStep from '@/components/survey/create/SurveyDetailsStep';
 import SurveyOutroStep from '@/components/survey/create/SurveyOutroStep';
-import type { Contact, FormValues, SetFieldValue } from '@/components/survey/create/types';
+import type {
+    Contact,
+    FormValues,
+    GetFieldError,
+    IsFieldTouched,
+    SetFieldTouched,
+    SetFieldValue,
+} from '@/components/survey/create/types';
 
 interface SurveyCreateStepContentProps {
     currentStep: number;
     sendSurveyStep: number;
     values: FormValues;
-    errors: FormikErrors<FormValues>;
-    touched: FormikTouched<FormValues>;
+    getFieldError: GetFieldError;
+    isFieldTouched: IsFieldTouched;
     setFieldValue: SetFieldValue;
+    setFieldTouched: SetFieldTouched;
     contacts: Contact[];
     today: Date;
     recipientInputMode: 'contacts' | 'upload';
@@ -35,9 +42,10 @@ export default function SurveyCreateStepContent({
     currentStep,
     sendSurveyStep,
     values,
-    errors,
-    touched,
+    getFieldError,
+    isFieldTouched,
     setFieldValue,
+    setFieldTouched,
     contacts,
     today,
     recipientInputMode,
@@ -53,9 +61,10 @@ export default function SurveyCreateStepContent({
             return (
                 <SurveyDetailsStep
                     values={values}
-                    errors={errors}
-                    touched={touched}
+                    getFieldError={getFieldError}
+                    isFieldTouched={isFieldTouched}
                     setFieldValue={setFieldValue}
+                    setFieldTouched={setFieldTouched}
                     today={today}
                 />
             );
@@ -64,7 +73,9 @@ export default function SurveyCreateStepContent({
             return (
                 <QuestionsStep
                     values={values}
+                    getFieldError={getFieldError}
                     setFieldValue={setFieldValue}
+                    setFieldTouched={setFieldTouched}
                     childQuestionStates={childQuestionStates}
                     setChildQuestionStates={setChildQuestionStates}
                 />
@@ -74,7 +85,10 @@ export default function SurveyCreateStepContent({
             return (
                 <SurveyOutroStep
                     values={values}
+                    getFieldError={getFieldError}
+                    isFieldTouched={isFieldTouched}
                     setFieldValue={setFieldValue}
+                    setFieldTouched={setFieldTouched}
                 />
             );
 
@@ -107,6 +121,9 @@ export default function SurveyCreateStepContent({
                         <InvitationStep
                             values={values}
                             setFieldValue={setFieldValue}
+                            setFieldTouched={setFieldTouched}
+                            getFieldError={getFieldError}
+                            isFieldTouched={isFieldTouched}
                         />
                     );
 

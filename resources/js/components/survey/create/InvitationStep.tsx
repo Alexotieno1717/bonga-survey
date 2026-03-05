@@ -1,6 +1,11 @@
-import { Field } from 'formik';
 import { getCurrentDateTimeLocalValue } from '@/components/survey/create/create-utils';
-import type { FormValues, SetFieldValue } from '@/components/survey/create/types';
+import type {
+    FormValues,
+    GetFieldError,
+    IsFieldTouched,
+    SetFieldTouched,
+    SetFieldValue,
+} from '@/components/survey/create/types';
 import SurveyField, { surveyTextareaClassName } from '@/components/survey/SurveyField';
 import SurveySectionCard from '@/components/survey/SurveySectionCard';
 import SurveyStepIntroCard from '@/components/survey/SurveyStepIntroCard';
@@ -9,12 +14,25 @@ import { cn } from '@/lib/utils';
 interface InvitationStepProps {
     values: FormValues;
     setFieldValue: SetFieldValue;
+    setFieldTouched: SetFieldTouched;
+    getFieldError: GetFieldError;
+    isFieldTouched: IsFieldTouched;
 }
 
 export default function InvitationStep({
     values,
     setFieldValue,
+    setFieldTouched,
+    getFieldError,
+    isFieldTouched,
 }: InvitationStepProps) {
+    const invitationMessageError = isFieldTouched('invitationMessage')
+        ? getFieldError('invitationMessage')
+        : undefined;
+    const scheduleTimeError = isFieldTouched('scheduleTime')
+        ? getFieldError('scheduleTime')
+        : undefined;
+
     return (
         <div className="space-y-6">
             <SurveyStepIntroCard
@@ -29,13 +47,23 @@ export default function InvitationStep({
                         {values.invitationMessage.length || 0} chars
                     </span>
                 </div>
-                <Field
-                    as="textarea"
+                <textarea
                     name="invitationMessage"
                     className={cn(surveyTextareaClassName, 'min-h-30 rounded-xl')}
                     rows={4}
                     placeholder="Reply with START to participate"
+                    value={values.invitationMessage}
+                    onBlur={() => {
+                        setFieldTouched('invitationMessage', true);
+                    }}
+                    onChange={(event) => {
+                        setFieldValue('invitationMessage', event.target.value);
+                    }}
                 />
+
+                {invitationMessageError ? (
+                    <p className="pt-2 text-xs text-red-500">{invitationMessageError}</p>
+                ) : null}
 
                 <div className="mt-4 space-y-2 text-xs text-slate-500">
                     <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
@@ -50,7 +78,7 @@ export default function InvitationStep({
             </SurveySectionCard>
 
             <SurveySectionCard className="p-5 md:p-6">
-                <SurveyField label="Schedule Time">
+                <SurveyField label="Schedule Time" error={scheduleTimeError}>
                     <div className="mt-1 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
                         <button
                             type="button"
@@ -76,13 +104,14 @@ export default function InvitationStep({
                             onClick={() => {
                                 setFieldValue('scheduleMode', 'later');
                                 setFieldValue('scheduleTime', '');
+                                setFieldTouched('scheduleTime', true);
                             }}
                         >
                             Schedule for Later
                         </button>
                     </div>
 
-                    <Field
+                    <input
                         type="datetime-local"
                         name="scheduleTime"
                         disabled={values.scheduleMode === 'now'}
@@ -92,7 +121,10 @@ export default function InvitationStep({
                                 ? getCurrentDateTimeLocalValue()
                                 : values.scheduleTime
                         }
-                        onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                        onBlur={() => {
+                            setFieldTouched('scheduleTime', true);
+                        }}
+                        onChange={(event) => {
                             setFieldValue('scheduleTime', event.target.value);
                         }}
                     />

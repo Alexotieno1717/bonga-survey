@@ -9,6 +9,9 @@ interface SurveyQuestionOptionRowProps {
     allowMultiple: boolean;
     isOptionSaved: boolean;
     branchingFieldName: string;
+    branchingValue: string;
+    onBranchingChange: (value: string) => void;
+    onBranchingBlur?: () => void;
     childQuestionsButtonLabel: string;
     onRemove: () => void;
     onOptionChange: (value: string) => void;
@@ -24,6 +27,9 @@ export default function SurveyQuestionOptionRow({
     allowMultiple,
     isOptionSaved,
     branchingFieldName,
+    branchingValue,
+    onBranchingChange,
+    onBranchingBlur,
     childQuestionsButtonLabel,
     onRemove,
     onOptionChange,
@@ -96,6 +102,9 @@ export default function SurveyQuestionOptionRow({
                             currentQuestionIndex={questionIndex}
                             questionCount={questionCount}
                             noMoreLabel="-- No More Options --"
+                            value={branchingValue}
+                            onChange={onBranchingChange}
+                            onBlur={onBranchingBlur}
                         />
                     </div>
                 ) : null}

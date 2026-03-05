@@ -1,4 +1,3 @@
-import { Field } from 'formik';
 import React from 'react';
 import ChildQuestionsModal from '@/components/ChildQuestionsModal';
 import type { ChildQuestionOptionState } from '@/components/ChildQuestionsModal';
@@ -12,7 +11,15 @@ import {
     resolveNextParentQuestionIndexFromTarget,
     resolveNextSimulatorQuestionIndex,
 } from '@/components/survey/create/simulator-utils';
-import type { FormValues, Question, SetFieldValue, SimulatorMessage, SimulatorSession } from '@/components/survey/create/types';
+import type {
+    FormValues,
+    GetFieldError,
+    Question,
+    SetFieldTouched,
+    SetFieldValue,
+    SimulatorMessage,
+    SimulatorSession,
+} from '@/components/survey/create/types';
 import SurveyBranchingSelect from '@/components/survey/SurveyBranchingSelect';
 import SurveyQuestionCard from '@/components/survey/SurveyQuestionCard';
 import SurveyQuestionFooterActions from '@/components/survey/SurveyQuestionFooterActions';
@@ -25,6 +32,8 @@ import { Button } from '@/components/ui/button';
 interface QuestionsStepProps {
     values: FormValues;
     setFieldValue: SetFieldValue;
+    setFieldTouched: SetFieldTouched;
+    getFieldError: GetFieldError;
     childQuestionStates: Record<string, ChildQuestionOptionState>;
     setChildQuestionStates: React.Dispatch<React.SetStateAction<Record<string, ChildQuestionOptionState>>>;
 }
@@ -32,6 +41,8 @@ interface QuestionsStepProps {
 export default function QuestionsStep({
     values,
     setFieldValue,
+    setFieldTouched,
+    getFieldError,
     childQuestionStates,
     setChildQuestionStates,
 }: QuestionsStepProps) {
@@ -560,6 +571,11 @@ export default function QuestionsStep({
                             <SurveyQuestionMainFields
                                 index={index}
                                 isSaved={Boolean(question.isSaved)}
+                                question={question.question}
+                                responseType={question.responseType}
+                                setFieldValue={setFieldValue}
+                                setFieldTouched={setFieldTouched}
+                                getFieldError={getFieldError}
                                 onMarkEditing={() => {
                                     setFieldValue(`questions[${index}].isEditing`, true);
                                 }}
@@ -572,11 +588,15 @@ export default function QuestionsStep({
                                     </div>
 
                                     <div className="mb-4 flex items-center space-x-2">
-                                        <Field
+                                        <input
                                             type="checkbox"
                                             name={`questions[${index}].allowMultiple`}
                                             id={`allowMultiple-${index}`}
                                             className="h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+                                            checked={Boolean(question.allowMultiple)}
+                                            onChange={(event) => {
+                                                setFieldValue(`questions[${index}].allowMultiple`, event.target.checked);
+                                            }}
                                         />
                                         <label htmlFor={`allowMultiple-${index}`} className="text-sm font-medium text-slate-700">
                                             Allow participant to pick more than one option
@@ -594,6 +614,15 @@ export default function QuestionsStep({
                                                 allowMultiple={Boolean(question.allowMultiple)}
                                                 isOptionSaved={Boolean(question.optionSaveStates?.[optionIndex])}
                                                 branchingFieldName={`questions[${index}].branching[${optionIndex}]`}
+                                                branchingValue={Array.isArray(question.branching)
+                                                    ? String(question.branching[optionIndex] ?? '0')
+                                                    : '0'}
+                                                onBranchingChange={(value) => {
+                                                    setFieldValue(`questions[${index}].branching[${optionIndex}]`, value);
+                                                }}
+                                                onBranchingBlur={() => {
+                                                    setFieldTouched(`questions[${index}].branching[${optionIndex}]`, true);
+                                                }}
                                                 childQuestionsButtonLabel={(() => {
                                                     const optionStateKey = childQuestionStateKey(index, optionIndex);
                                                     const optionChildState = childQuestionStates[optionStateKey];
@@ -691,6 +720,17 @@ export default function QuestionsStep({
                                         currentQuestionIndex={index}
                                         questionCount={values.questions.length}
                                         noMoreLabel="-- No questions --"
+                                        value={
+                                            typeof question.branching === 'string' || typeof question.branching === 'number'
+                                                ? String(question.branching)
+                                                : '0'
+                                        }
+                                        onChange={(value) => {
+                                            setFieldValue(`questions[${index}].branching`, value);
+                                        }}
+                                        onBlur={() => {
+                                            setFieldTouched(`questions[${index}].branching`, true);
+                                        }}
                                     />
                                 </div>
                             ) : null}

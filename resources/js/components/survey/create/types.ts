@@ -40,6 +40,10 @@ export interface FormValues {
     scheduleTime: string;
 }
 
+export type FormErrors = Record<string, string>;
+
+export type FormTouched = Record<string, boolean>;
+
 export interface SimulatorMessage {
     id: number;
     sender: 'system' | 'user' | 'muted';
@@ -65,3 +69,9 @@ export interface SimulatorSession {
 }
 
 export type SetFieldValue = (field: string, value: unknown) => void;
+
+export type SetFieldTouched = (field: string, touched?: boolean) => void;
+
+export type GetFieldError = (field: string) => string | undefined;
+
+export type IsFieldTouched = (field: string) => boolean;

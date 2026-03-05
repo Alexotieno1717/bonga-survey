@@ -1,4 +1,3 @@
-import { Field } from 'formik';
 import type { Contact, FormValues, SetFieldValue } from '@/components/survey/create/types';
 import { Button } from '@/components/ui/button';
 
@@ -76,11 +75,12 @@ export default function AddRecipientsStep({
                                 }`}
                             >
                                 <div className="flex items-center gap-2">
-                                    <Field
+                                    <input
                                         type="radio"
                                         name="recipientSelectionType"
                                         value="all"
                                         className="form-radio"
+                                        checked={values.recipientSelectionType === 'all'}
                                         onChange={() => {
                                             setFieldValue('recipientSelectionType', 'all');
                                             setFieldValue('recipients', contacts);
@@ -101,11 +101,12 @@ export default function AddRecipientsStep({
                                 }`}
                             >
                                 <div className="flex items-center gap-2">
-                                    <Field
+                                    <input
                                         type="radio"
                                         name="recipientSelectionType"
                                         value="select"
                                         className="form-radio"
+                                        checked={values.recipientSelectionType === 'select'}
                                         onChange={() => {
                                             setFieldValue('recipientSelectionType', 'select');
                                             setFieldValue('recipients', []);

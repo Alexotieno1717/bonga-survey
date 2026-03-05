@@ -1,23 +1,21 @@
-import { useField } from 'formik';
 import type { FC } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 
 interface DatePickerProps {
-    name: string;
+    value: Date | null;
     minDate?: Date;
     onSelectDate?: (date: Date | undefined) => void;
+    onBlur?: () => void;
 }
 
-const DatePicker: FC<DatePickerProps> = ({ name, minDate, onSelectDate }) => {
-    const [field, , helpers] = useField<Date | null>(name);
-
+const DatePicker: FC<DatePickerProps> = ({ value, minDate, onSelectDate, onBlur }) => {
     return (
         <Calendar
             mode="single"
-            selected={field.value ? new Date(field.value) : undefined}
+            selected={value ? new Date(value) : undefined}
             onSelect={(date) => {
-                helpers.setValue(date ?? null);
                 onSelectDate?.(date);
+                onBlur?.();
             }}
             disabled={(date) => (minDate ? date < minDate : false)}
             initialFocus

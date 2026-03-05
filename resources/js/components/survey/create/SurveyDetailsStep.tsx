@@ -1,10 +1,14 @@
 import { format } from 'date-fns';
-import { ErrorMessage, Field } from 'formik';
-import type { FormikErrors, FormikTouched } from 'formik';
 import { CalendarIcon } from 'lucide-react';
 import DatePicker from '@/components/DatePicker';
 import { buildDefaultInvitationMessage } from '@/components/survey/create/create-utils';
-import type { FormValues, SetFieldValue } from '@/components/survey/create/types';
+import type {
+    FormValues,
+    GetFieldError,
+    IsFieldTouched,
+    SetFieldTouched,
+    SetFieldValue,
+} from '@/components/survey/create/types';
 import SurveyField, {
     surveyInputClassName,
     surveySelectClassName,
@@ -18,19 +22,29 @@ import { cn } from '@/lib/utils';
 
 interface SurveyDetailsStepProps {
     values: FormValues;
-    errors: FormikErrors<FormValues>;
-    touched: FormikTouched<FormValues>;
     setFieldValue: SetFieldValue;
+    setFieldTouched: SetFieldTouched;
+    getFieldError: GetFieldError;
+    isFieldTouched: IsFieldTouched;
     today: Date;
 }
 
 export default function SurveyDetailsStep({
     values,
-    errors,
-    touched,
     setFieldValue,
+    setFieldTouched,
+    getFieldError,
+    isFieldTouched,
     today,
 }: SurveyDetailsStepProps) {
+    const resolveFieldError = (field: string): string | undefined => {
+        if (!isFieldTouched(field)) {
+            return undefined;
+        }
+
+        return getFieldError(field);
+    };
+
     return (
         <div className="space-y-6">
             <SurveyStepIntroCard
@@ -42,32 +56,45 @@ export default function SurveyDetailsStep({
                 <div className="space-y-5">
                     <SurveyField
                         label="Survey Name"
-                        error={errors.surveyName && touched.surveyName ? <ErrorMessage name="surveyName" /> : null}
+                        error={resolveFieldError('surveyName')}
                     >
-                        <Field
+                        <input
                             name="surveyName"
                             type="text"
                             className={surveyInputClassName}
                             placeholder="Enter survey title"
+                            value={values.surveyName}
+                            onBlur={() => {
+                                setFieldTouched('surveyName', true);
+                            }}
+                            onChange={(event) => {
+                                setFieldValue('surveyName', event.target.value);
+                            }}
                         />
                     </SurveyField>
 
                     <SurveyField
                         label="Description"
-                        error={errors.description && touched.description ? <ErrorMessage name="description" /> : null}
+                        error={resolveFieldError('description')}
                     >
-                        <Field
+                        <textarea
                             name="description"
-                            as="textarea"
                             className={cn(surveyTextareaClassName, 'min-h-[110px]')}
                             placeholder="Write a short description of this survey"
+                            value={values.description}
+                            onBlur={() => {
+                                setFieldTouched('description', true);
+                            }}
+                            onChange={(event) => {
+                                setFieldValue('description', event.target.value);
+                            }}
                         />
                     </SurveyField>
 
                     <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
                         <SurveyField
                             label="Start Date"
-                            error={errors.startDate && touched.startDate ? <ErrorMessage name="startDate" /> : null}
+                            error={resolveFieldError('startDate')}
                         >
                             <Popover>
                                 <PopoverTrigger asChild>
@@ -89,9 +116,14 @@ export default function SurveyDetailsStep({
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
                                     <DatePicker
-                                        name="startDate"
+                                        value={values.startDate}
                                         minDate={today}
+                                        onBlur={() => {
+                                            setFieldTouched('startDate', true);
+                                        }}
                                         onSelectDate={(date) => {
+                                            setFieldValue('startDate', date ?? null);
+
                                             if (!date) {
                                                 return;
                                             }
@@ -107,7 +139,7 @@ export default function SurveyDetailsStep({
 
                         <SurveyField
                             label="End Date"
-                            error={errors.endDate && touched.endDate ? <ErrorMessage name="endDate" /> : null}
+                            error={resolveFieldError('endDate')}
                         >
                             <Popover>
                                 <PopoverTrigger asChild>
@@ -129,8 +161,14 @@ export default function SurveyDetailsStep({
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
                                     <DatePicker
-                                        name="endDate"
+                                        value={values.endDate}
                                         minDate={values.startDate ?? today}
+                                        onBlur={() => {
+                                            setFieldTouched('endDate', true);
+                                        }}
+                                        onSelectDate={(date) => {
+                                            setFieldValue('endDate', date ?? null);
+                                        }}
                                     />
                                 </PopoverContent>
                             </Popover>
@@ -144,29 +182,37 @@ export default function SurveyDetailsStep({
                     <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2">
                         <SurveyField
                             label="Short Code"
-                            error={errors.shortCode && touched.shortCode ? <ErrorMessage name="shortCode" /> : null}
+                            error={resolveFieldError('shortCode')}
                         >
-                            <Field
-                                as="select"
+                            <select
                                 name="shortCode"
                                 className={surveySelectClassName}
+                                value={values.shortCode}
+                                onBlur={() => {
+                                    setFieldTouched('shortCode', true);
+                                }}
+                                onChange={(event) => {
+                                    setFieldValue('shortCode', event.target.value);
+                                }}
                             >
                                 <option value="20642">20642</option>
-                            </Field>
+                            </select>
                         </SurveyField>
 
                         <SurveyField
                             label="Trigger Word"
-                            error={errors.triggerWord && touched.triggerWord ? <ErrorMessage name="triggerWord" /> : null}
+                            error={resolveFieldError('triggerWord')}
                         >
-                            <Field
+                            <input
                                 type="text"
                                 name="triggerWord"
                                 placeholder="Enter trigger word"
-                                cols={30}
-                                rows={5}
+                                value={values.triggerWord}
                                 className={cn(surveyInputClassName, 'px-3 disabled:cursor-not-allowed disabled:opacity-50')}
-                                onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                                onBlur={() => {
+                                    setFieldTouched('triggerWord', true);
+                                }}
+                                onChange={(event) => {
                                     const nextTriggerWord = event.target.value;
                                     const previousDefaultMessage = buildDefaultInvitationMessage(values.triggerWord);
                                     const nextDefaultMessage = buildDefaultInvitationMessage(nextTriggerWord);
