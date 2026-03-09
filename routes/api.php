@@ -14,5 +14,5 @@ Route::put('/contacts/{contact}', [ContactController::class, 'update']);
 Route::delete('/contacts/{contact}', [ContactController::class, 'destroy']);
 // });
 
-Route::post('/sms/incoming', SurveySmsWebhookController::class)->name('sms.incoming');
-Route::post('/sms/webhook', SurveySmsWebhookController::class)->name('sms.webhook');
+Route::match(['GET', 'POST'], '/sms/incoming', SurveySmsWebhookController::class)->name('sms.incoming');
+Route::match(['GET', 'POST'], '/sms/webhook', SurveySmsWebhookController::class)->name('sms.webhook');

@@ -35,8 +35,25 @@ class HandleInboundSmsRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
-            $phoneNumber = $this->extractPayloadValue(['MSISDN', 'msisdn', 'phone', 'from']);
-            $message = $this->extractPayloadValue(['txtMessage', 'txtmessage', 'message', 'text', 'body']);
+            $phoneNumber = $this->extractPayloadValue([
+                'MSISDN',
+                'msisdn',
+                'phone',
+                'from',
+                'mobile',
+                'source_addr',
+                'originator',
+                'sender',
+            ]);
+            $message = $this->extractPayloadValue([
+                'txtMessage',
+                'txtmessage',
+                'message',
+                'text',
+                'body',
+                'content',
+                'sms',
+            ]);
 
             if ($phoneNumber === '') {
                 $validator->errors()->add('MSISDN', 'A phone number is required.');
@@ -53,12 +70,21 @@ class HandleInboundSmsRequest extends FormRequest
      */
     private function extractPayloadValue(array $keys): string
     {
+        $payload = $this->all();
+        $normalizedPayload = [];
+
+        foreach ($payload as $key => $value) {
+            $normalizedPayload[mb_strtolower((string) $key)] = $value;
+        }
+
         foreach ($keys as $key) {
-            if (! $this->exists($key)) {
+            $normalizedKey = mb_strtolower($key);
+
+            if (! array_key_exists($normalizedKey, $normalizedPayload)) {
                 continue;
             }
 
-            $value = $this->input($key);
+            $value = $normalizedPayload[$normalizedKey];
             if (is_scalar($value)) {
                 return trim((string) $value);
             }

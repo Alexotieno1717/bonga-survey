@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Actions\Survey\HandleIncomingSurveyMessage;
 use App\Http\Requests\Survey\HandleInboundSmsRequest;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 
 class SurveySmsWebhookController extends Controller
 {
@@ -16,10 +17,35 @@ class SurveySmsWebhookController extends Controller
 
     public function __invoke(HandleInboundSmsRequest $request): JsonResponse
     {
-        $payload = $request->validated();
-        $phoneNumber = $this->extractPayloadValue($payload, ['MSISDN', 'msisdn', 'phone', 'from']);
-        $message = $this->extractPayloadValue($payload, ['txtMessage', 'txtmessage', 'message', 'text', 'body']);
+        $payload = $request->all();
+        $phoneNumber = $this->extractPayloadValue($payload, [
+            'MSISDN',
+            'msisdn',
+            'phone',
+            'from',
+            'mobile',
+            'source_addr',
+            'originator',
+            'sender',
+        ]);
+        $message = $this->extractPayloadValue($payload, [
+            'txtMessage',
+            'txtmessage',
+            'message',
+            'text',
+            'body',
+            'content',
+            'sms',
+        ]);
         $result = $this->handleIncomingSurveyMessage->handle($phoneNumber, $message);
+
+        Log::info('Inbound SMS webhook processed.', [
+            'phone' => $phoneNumber,
+            'message_length' => mb_strlen($message),
+            'status' => $result['status'] ?? 'unknown',
+            'processed' => $result['processed'] ?? false,
+            'payload_keys' => array_keys($payload),
+        ]);
 
         return response()->json($result);
     }
@@ -30,12 +56,19 @@ class SurveySmsWebhookController extends Controller
      */
     private function extractPayloadValue(array $payload, array $keys): string
     {
+        $normalizedPayload = [];
+        foreach ($payload as $key => $value) {
+            $normalizedPayload[mb_strtolower((string) $key)] = $value;
+        }
+
         foreach ($keys as $key) {
-            if (! array_key_exists($key, $payload)) {
+            $normalizedKey = mb_strtolower($key);
+
+            if (! array_key_exists($normalizedKey, $normalizedPayload)) {
                 continue;
             }
 
-            $value = $payload[$key];
+            $value = $normalizedPayload[$normalizedKey];
             if (is_scalar($value)) {
                 return trim((string) $value);
             }

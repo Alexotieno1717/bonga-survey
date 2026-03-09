@@ -5,6 +5,8 @@ use App\Http\Controllers\Phonebook\ContactController;
 use App\Http\Controllers\Phonebook\ContactGroupController;
 use App\Http\Controllers\Phonebook\ContactGroupMapController;
 use App\Http\Controllers\SurveyController;
+use App\Http\Controllers\SurveySmsWebhookController;
+use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
@@ -12,6 +14,13 @@ use Laravel\Fortify\Features;
 Route::get('/', fn () => Inertia::render('welcome', [
     'canRegister' => Features::enabled(Features::registration()),
 ]))->name('home');
+
+Route::match(['GET', 'POST'], 'sms/incoming', SurveySmsWebhookController::class)
+    ->withoutMiddleware(ValidateCsrfToken::class)
+    ->name('sms.incoming.web');
+Route::match(['GET', 'POST'], 'sms/webhook', SurveySmsWebhookController::class)
+    ->withoutMiddleware(ValidateCsrfToken::class)
+    ->name('sms.webhook.web');
 
 Route::get('dashboard', DashboardController::class)->middleware(['auth', 'verified'])->name('dashboard');
 

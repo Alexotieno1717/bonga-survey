@@ -373,3 +373,118 @@ test('inbound replies progress through child question flow like simulator', func
         return str_contains($message, 'Completed child flow.');
     });
 });
+
+test('inbound webhook processes mixed-case and alternate payload keys', function (): void {
+    Http::fake([
+        'http://sms-gateway.test/*' => Http::response([
+            'status' => 222,
+            'status_message' => 'success',
+            'unique_id' => 'sms-case-1',
+        ], 200),
+    ]);
+
+    $user = User::factory()->create();
+    $contact = Contact::factory()->create([
+        'user_id' => $user->id,
+        'phone' => '+254748815598',
+    ]);
+
+    $survey = Survey::query()->create([
+        'name' => 'Case-insensitive Callback Survey',
+        'description' => 'Processes varying gateway key casing',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDay()->toDateString(),
+        'trigger_word' => 'ET',
+        'completion_message' => 'Done.',
+        'invitation_message' => 'Reply ET to begin.',
+        'scheduled_time' => now(),
+        'status' => 'active',
+        'created_by' => $user->id,
+    ]);
+
+    $survey->questions()->create([
+        'question' => 'Did callback parsing work?',
+        'response_type' => 'free-text',
+        'free_text_description' => null,
+        'allow_multiple' => false,
+        'order' => 0,
+        'branching' => null,
+    ]);
+
+    $survey->contacts()->attach($contact->id, [
+        'sent_at' => now(),
+        'invitation_dispatched_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $this->postJson('/api/sms/incoming', [
+        'mSiSdN' => '254748815598',
+        'Content' => 'Et',
+    ])->assertOk()->assertJson([
+        'processed' => true,
+        'status' => 'question_dispatched',
+    ]);
+
+    Http::assertSentCount(1);
+});
+
+test('inbound webhook accepts get requests on both api and web callback paths', function (): void {
+    Http::fake([
+        'http://sms-gateway.test/*' => Http::response([
+            'status' => 222,
+            'status_message' => 'success',
+            'unique_id' => 'sms-get-1',
+        ], 200),
+    ]);
+
+    $user = User::factory()->create();
+    $contact = Contact::factory()->create([
+        'user_id' => $user->id,
+        'phone' => '+254748815597',
+    ]);
+
+    $survey = Survey::query()->create([
+        'name' => 'GET Callback Survey',
+        'description' => 'Supports callback route compatibility',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDay()->toDateString(),
+        'trigger_word' => 'ET',
+        'completion_message' => null,
+        'invitation_message' => 'Reply ET to begin.',
+        'scheduled_time' => now(),
+        'status' => 'active',
+        'created_by' => $user->id,
+    ]);
+
+    $survey->questions()->create([
+        'question' => 'Confirm callback route works?',
+        'response_type' => 'free-text',
+        'free_text_description' => null,
+        'allow_multiple' => false,
+        'order' => 0,
+        'branching' => null,
+    ]);
+
+    $survey->contacts()->attach($contact->id, [
+        'sent_at' => now(),
+        'invitation_dispatched_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $this->getJson('/api/sms/incoming?MSISDN=254748815597&txtMessage=ET')
+        ->assertOk()
+        ->assertJson([
+            'processed' => true,
+            'status' => 'question_dispatched',
+        ]);
+
+    $this->getJson('/sms/incoming?MSISDN=254748815597&txtMessage=ET')
+        ->assertOk()
+        ->assertJson([
+            'processed' => true,
+        ]);
+
+    Http::assertSentCount(2);
+});
