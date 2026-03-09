@@ -7,6 +7,7 @@ use App\Models\Survey;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('authenticated user can create a survey with questions, options and recipients', function (): void {
@@ -110,6 +111,51 @@ test('authenticated user can save survey as draft without recipients or schedule
     expect($survey->status)->toBe('draft');
     expect($survey->questions()->count())->toBe(1);
     expect($survey->contacts()->count())->toBe(0);
+});
+
+test('active survey creation normalizes datetime-local schedule to database datetime format', function (): void {
+    $this->withoutMiddleware(ValidateCsrfToken::class);
+
+    $user = User::factory()->create();
+    $contact = Contact::factory()->create([
+        'user_id' => $user->id,
+    ]);
+
+    $response = $this
+        ->actingAs($user)
+        ->post(route('questions.store'), [
+            'status' => 'active',
+            'surveyName' => 'DateTime Local Survey',
+            'description' => 'Ensures sent_at is normalized',
+            'startDate' => now()->toDateString(),
+            'endDate' => now()->addDay()->toDateString(),
+            'triggerWord' => 'DATETIME-LOCAL-2026',
+            'completionMessage' => 'Thanks',
+            'invitationMessage' => 'Reply START to continue.',
+            'scheduleTime' => '2026-03-06T11:57',
+            'questions' => [
+                [
+                    'question' => 'How are you?',
+                    'responseType' => 'free-text',
+                    'allowMultiple' => false,
+                    'branching' => -1,
+                ],
+            ],
+            'recipients' => [
+                ['id' => $contact->id],
+            ],
+        ]);
+
+    $response->assertRedirect(route('questions.index'));
+
+    $survey = Survey::query()->where('trigger_word', 'DATETIME-LOCAL-2026')->firstOrFail();
+    $sentAt = (string) DB::table('contact_survey')
+        ->where('survey_id', $survey->id)
+        ->where('contact_id', $contact->id)
+        ->value('sent_at');
+
+    expect($sentAt)->toBe('2026-03-06 11:57:00');
+    expect($survey->scheduled_time?->toDateTimeString())->toBe('2026-03-06 11:57:00');
 });
 
 test('survey stores option child-question flow and branching metadata', function (): void {

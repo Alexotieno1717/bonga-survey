@@ -9,3 +9,4 @@ Artisan::command('inspire', function (): void {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('surveys:sync-statuses')->everyMinute();
+Schedule::command('surveys:send-invitations')->everyMinute();

@@ -43,7 +43,13 @@ class Survey extends Model
     public function contacts(): BelongsToMany
     {
         return $this->belongsToMany(Contact::class, 'contact_survey')
-            ->withPivot(['sent_at'])
+            ->withPivot([
+                'sent_at',
+                'invitation_dispatched_at',
+                'sms_flow_state',
+                'sms_flow_started_at',
+                'sms_flow_completed_at',
+            ])
             ->withTimestamps();
     }
 

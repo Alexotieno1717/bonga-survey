@@ -7,6 +7,7 @@ interface BuildSurveyPayloadParams {
     formattedStartDate: string;
     formattedEndDate: string;
     scheduleTime: string;
+    submissionAction: FormValues['submissionAction'];
 }
 
 export const buildSurveyPayload = ({
@@ -15,9 +16,10 @@ export const buildSurveyPayload = ({
     formattedStartDate,
     formattedEndDate,
     scheduleTime,
+    submissionAction,
 }: BuildSurveyPayloadParams): Record<string, unknown> => {
     return {
-        status: values.submissionAction,
+        status: submissionAction,
         surveyName: values.surveyName,
         description: values.description,
         startDate: formattedStartDate,

@@ -194,7 +194,7 @@ export default function Create() {
         return validateStep(questionStepFields);
     };
 
-    const submitForm = (): void => {
+    const submitForm = (submissionAction: FormValues['submissionAction']): void => {
         try {
             const payload = buildSurveyPayload({
                 values: data,
@@ -204,13 +204,14 @@ export default function Create() {
                 scheduleTime: data.scheduleMode === 'now'
                     ? getCurrentDateTimeLocalValue()
                     : data.scheduleTime,
+                submissionAction,
             });
 
             transform(() => payload as unknown as FormValues);
             post(questions.store().url, {
                 onSuccess: () => {
                     toast.success(
-                        data.submissionAction === 'active'
+                        submissionAction === 'active'
                             ? 'Survey published successfully!'
                             : 'Survey saved as draft successfully!',
                         {
@@ -313,35 +314,28 @@ export default function Create() {
                             }
                         }}
                         onSaveAsDraft={async () => {
-                            setFieldValue('submissionAction', 'draft');
-                            submitForm();
+                            submitForm('draft');
                         }}
                         onPublish={async () => {
-                            setFieldValue('submissionAction', 'active');
-
                             handleSurveyNextStep({
                                 currentStep,
                                 sendSurveyStep,
                                 values: data,
                                 validateDetailsStep,
                                 validateQuestionsStep,
-                                submitForm,
+                                submitForm: () => submitForm('active'),
                                 setCurrentStep,
                                 setSendSurveyStep,
                             });
                         }}
                         onNext={async () => {
-                            if (currentStep === 0) {
-                                setFieldValue('submissionAction', 'draft');
-                            }
-
                             handleSurveyNextStep({
                                 currentStep,
                                 sendSurveyStep,
                                 values: data,
                                 validateDetailsStep,
                                 validateQuestionsStep,
-                                submitForm,
+                                submitForm: () => submitForm('draft'),
                                 setCurrentStep,
                                 setSendSurveyStep,
                             });

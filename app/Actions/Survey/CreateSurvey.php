@@ -10,6 +10,10 @@ use Illuminate\Support\Facades\DB;
 
 class CreateSurvey
 {
+    public function __construct(
+        private readonly DispatchSurveyInvitations $dispatchSurveyInvitations,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $validated
      */
@@ -18,6 +22,9 @@ class CreateSurvey
         $requestedStatus = (string) ($validated['status'] ?? 'draft');
         $startDate = CarbonImmutable::parse((string) $validated['startDate'])->startOfDay();
         $endDate = CarbonImmutable::parse((string) $validated['endDate'])->endOfDay();
+        $scheduleTime = isset($validated['scheduleTime']) && $validated['scheduleTime'] !== ''
+            ? CarbonImmutable::parse((string) $validated['scheduleTime'])
+            : null;
         $now = now();
 
         $status = 'draft';
@@ -30,7 +37,7 @@ class CreateSurvey
         }
 
         /** @var Survey $survey */
-        $survey = DB::transaction(function () use ($validated, $userId, $status, $requestedStatus): Survey {
+        $survey = DB::transaction(function () use ($validated, $userId, $status, $requestedStatus, $scheduleTime): Survey {
             $survey = Survey::query()->create([
                 'name' => $validated['surveyName'],
                 'description' => $validated['description'],
@@ -39,7 +46,7 @@ class CreateSurvey
                 'trigger_word' => $validated['triggerWord'],
                 'completion_message' => $validated['completionMessage'] ?? null,
                 'invitation_message' => $validated['invitationMessage'],
-                'scheduled_time' => $validated['scheduleTime'],
+                'scheduled_time' => $scheduleTime?->toDateTimeString(),
                 'status' => $status,
                 'created_by' => $userId,
             ]);
@@ -90,7 +97,7 @@ class CreateSurvey
             $pivotData = [];
             foreach ($contactIds as $contactId) {
                 $pivotData[$contactId] = [
-                    'sent_at' => $requestedStatus === 'active' ? $validated['scheduleTime'] : null,
+                    'sent_at' => $requestedStatus === 'active' ? $scheduleTime?->toDateTimeString() : null,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
@@ -100,6 +107,10 @@ class CreateSurvey
 
             return $survey;
         });
+
+        if ($requestedStatus === 'active' && $scheduleTime instanceof CarbonImmutable && $scheduleTime->lessThanOrEqualTo($now)) {
+            $this->dispatchSurveyInvitations->handle((int) $survey->id);
+        }
 
         return $survey;
     }
@@ -135,8 +146,10 @@ class CreateSurvey
 
             $questionText = trim((string) ($childQuestionData['question'] ?? ''));
             $isSaved = (bool) ($childQuestionData['isSaved'] ?? false);
-
-            if ($questionText === '' || ! $isSaved) {
+            if ($questionText === '') {
+                continue;
+            }
+            if (! $isSaved) {
                 continue;
             }
 
@@ -196,7 +209,7 @@ class CreateSurvey
             $nextQuestionTarget = $followUpTarget;
         }
 
-        if ($nextQuestionTarget === null && empty($normalizedChildQuestions)) {
+        if ($nextQuestionTarget === null && $normalizedChildQuestions === []) {
             return null;
         }
 

@@ -46,15 +46,13 @@ class DashboardController extends Controller
             ->latest()
             ->limit(5)
             ->get()
-            ->map(function (Survey $survey): array {
-                return [
-                    'id' => $survey->id,
-                    'name' => $survey->name,
-                    'status' => $survey->status,
-                    'created_at' => $survey->created_at?->toDateTimeString(),
-                    'contacts_count' => $survey->contacts_count,
-                ];
-            });
+            ->map(fn (Survey $survey): array => [
+                'id' => $survey->id,
+                'name' => $survey->name,
+                'status' => $survey->status,
+                'created_at' => $survey->created_at?->toDateTimeString(),
+                'contacts_count' => $survey->contacts_count,
+            ]);
 
         return Inertia::render('dashboard', [
             'surveyStats' => [

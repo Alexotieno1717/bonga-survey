@@ -35,4 +35,15 @@ return [
         ],
     ],
 
+    'sms' => [
+        'url' => env('SMS_GATEWAY_URL', 'http://167.172.14.50:4002/v1/send-sms'),
+        'client_id' => env('SMS_GATEWAY_CLIENT_ID'),
+        'key' => env('SMS_GATEWAY_KEY'),
+        'secret' => env('SMS_GATEWAY_SECRET'),
+        'service_id' => env('SMS_GATEWAY_SERVICE_ID'),
+        'timeout' => (int) env('SMS_GATEWAY_TIMEOUT', 15),
+        'retry_attempts' => (int) env('SMS_GATEWAY_RETRY_ATTEMPTS', 3),
+        'retry_base_delay_ms' => (int) env('SMS_GATEWAY_RETRY_BASE_DELAY_MS', 300),
+    ],
+
 ];

@@ -44,19 +44,17 @@ class SurveyController extends Controller
             ->where('user_id', Auth::id())
             ->with('group')
             ->get()
-            ->map(function ($contact) {
-                return [
-                    'id' => $contact->id,
-                    'names' => $contact->names,
-                    'phone' => $contact->phone,
-                    'email' => $contact->email,
-                    'gender' => $contact->gender,
-                    'contact_group' => $contact->group ? [
-                        'id' => $contact->group->id,
-                        'name' => $contact->group->name,
-                    ] : null,
-                ];
-            });
+            ->map(fn ($contact) => [
+                'id' => $contact->id,
+                'names' => $contact->names,
+                'phone' => $contact->phone,
+                'email' => $contact->email,
+                'gender' => $contact->gender,
+                'contact_group' => $contact->group ? [
+                    'id' => $contact->group->id,
+                    'name' => $contact->group->name,
+                ] : null,
+            ]);
 
         $contactGroups = ContactGroup::query()
             ->where('user_id', Auth::id())
@@ -389,41 +387,32 @@ class SurveyController extends Controller
             $groupId = null;
         }
 
-        $baseRecipientsQuery = function () use (
-            $survey,
-            $search,
-            $status,
-            $groupId,
-            $dateFrom,
-            $dateTo
-        ): BelongsToMany {
-            return $survey->contacts()
-                ->select('contacts.id', 'contacts.names', 'contacts.phone', 'contacts.email', 'contacts.contact_group_id')
-                ->with('group:id,name')
-                ->when($search !== '', function (Builder $query) use ($search): void {
-                    $query->where(function (Builder $innerQuery) use ($search): void {
-                        $innerQuery
-                            ->where('contacts.names', 'like', "%{$search}%")
-                            ->orWhere('contacts.phone', 'like', "%{$search}%")
-                            ->orWhere('contacts.email', 'like', "%{$search}%");
-                    });
-                })
-                ->when($groupId !== null, function (Builder $query) use ($groupId): void {
-                    $query->where('contacts.contact_group_id', $groupId);
-                })
-                ->when($status === 'sent', function (Builder $query): void {
-                    $query->whereNotNull('contact_survey.sent_at');
-                })
-                ->when($status === 'pending', function (Builder $query): void {
-                    $query->whereNull('contact_survey.sent_at');
-                })
-                ->when($dateFrom !== null, function (Builder $query) use ($dateFrom): void {
-                    $query->whereDate('contact_survey.sent_at', '>=', $dateFrom);
-                })
-                ->when($dateTo !== null, function (Builder $query) use ($dateTo): void {
-                    $query->whereDate('contact_survey.sent_at', '<=', $dateTo);
+        $baseRecipientsQuery = (fn (): BelongsToMany => $survey->contacts()
+            ->select('contacts.id', 'contacts.names', 'contacts.phone', 'contacts.email', 'contacts.contact_group_id')
+            ->with('group:id,name')
+            ->when($search !== '', function (Builder $query) use ($search): void {
+                $query->where(function (Builder $innerQuery) use ($search): void {
+                    $innerQuery
+                        ->where('contacts.names', 'like', "%{$search}%")
+                        ->orWhere('contacts.phone', 'like', "%{$search}%")
+                        ->orWhere('contacts.email', 'like', "%{$search}%");
                 });
-        };
+            })
+            ->when($groupId !== null, function (Builder $query) use ($groupId): void {
+                $query->where('contacts.contact_group_id', $groupId);
+            })
+            ->when($status === 'sent', function (Builder $query): void {
+                $query->whereNotNull('contact_survey.sent_at');
+            })
+            ->when($status === 'pending', function (Builder $query): void {
+                $query->whereNull('contact_survey.sent_at');
+            })
+            ->when($dateFrom !== null, function (Builder $query) use ($dateFrom): void {
+                $query->whereDate('contact_survey.sent_at', '>=', $dateFrom);
+            })
+            ->when($dateTo !== null, function (Builder $query) use ($dateTo): void {
+                $query->whereDate('contact_survey.sent_at', '<=', $dateTo);
+            }));
 
         if (in_array($exportFormat, ['csv', 'xlsx'], true)) {
             $allRecipients = $baseRecipientsQuery()
@@ -490,24 +479,20 @@ class SurveyController extends Controller
             ->all();
 
         $questionAnalytics = $survey->questions
-            ->map(function ($question): array {
-                return [
-                    'id' => $question->id,
-                    'question' => $question->question,
-                    'response_type' => $question->response_type,
-                    'total_responses' => 0,
-                    'free_text_count' => $question->response_type === 'free-text' ? 0 : null,
-                    'options' => $question->options
-                        ->map(function ($option): array {
-                            return [
-                                'id' => $option->id,
-                                'option' => $option->option,
-                                'count' => 0,
-                            ];
-                        })
-                        ->all(),
-                ];
-            })
+            ->map(fn ($question): array => [
+                'id' => $question->id,
+                'question' => $question->question,
+                'response_type' => $question->response_type,
+                'total_responses' => 0,
+                'free_text_count' => $question->response_type === 'free-text' ? 0 : null,
+                'options' => $question->options
+                    ->map(fn ($option): array => [
+                        'id' => $option->id,
+                        'option' => $option->option,
+                        'count' => 0,
+                    ])
+                    ->all(),
+            ])
             ->values()
             ->all();
 
