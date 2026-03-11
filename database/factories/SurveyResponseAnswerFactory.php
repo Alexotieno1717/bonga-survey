@@ -3,12 +3,13 @@
 namespace Database\Factories;
 
 use App\Models\Question;
+use App\Models\SurveyResponse;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Option>
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\SurveyResponseAnswer>
  */
-class OptionFactory extends Factory
+class SurveyResponseAnswerFactory extends Factory
 {
     /**
      * Define the model's default state.
@@ -18,10 +19,10 @@ class OptionFactory extends Factory
     public function definition(): array
     {
         return [
+            'survey_response_id' => SurveyResponse::factory(),
             'question_id' => Question::factory(),
-            'option' => $this->faker->word(),
-            'order' => $this->faker->numberBetween(0, 5),
-            'branching' => null,
+            'option_id' => null,
+            'answer_text' => $this->faker->sentence(),
         ];
     }
 }

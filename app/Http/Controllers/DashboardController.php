@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Survey;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Config;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -54,6 +55,11 @@ class DashboardController extends Controller
                 'contacts_count' => $survey->contacts_count,
             ]);
 
+        $smsDriver = (string) Config::get('services.sms.driver', 'http');
+        $smsOutbox = $smsDriver === 'log'
+            ? $this->readLocalSmsOutbox()
+            : [];
+
         return Inertia::render('dashboard', [
             'surveyStats' => [
                 'total' => $totalSurveys,
@@ -63,6 +69,128 @@ class DashboardController extends Controller
             ],
             'statusChart' => $statusChart,
             'recentSurveys' => $recentSurveys,
+            'smsDriver' => $smsDriver,
+            'smsOutbox' => $smsOutbox,
         ]);
+    }
+
+    /**
+     * @return array<int, array{sent_at: string, phone: string, message: string}>
+     */
+    private function readLocalSmsOutbox(): array
+    {
+        $logPath = storage_path('logs/laravel.log');
+        if (! is_file($logPath) || ! is_readable($logPath)) {
+            return [];
+        }
+
+        $lines = $this->readLogTailLines($logPath, 200, 262144);
+        $messages = [];
+
+        foreach (array_reverse($lines) as $line) {
+            if (! str_contains($line, 'SMS message logged locally.')) {
+                continue;
+            }
+
+            $timestamp = $this->extractLogTimestamp($line);
+            $context = $this->extractLogContext($line);
+
+            if (! is_array($context)) {
+                continue;
+            }
+
+            $phone = $context['phone'] ?? null;
+            $message = $context['message'] ?? null;
+
+            if (! is_string($phone) || ! is_string($message)) {
+                continue;
+            }
+
+            $messages[] = [
+                'sent_at' => $timestamp ?? '',
+                'phone' => $phone,
+                'message' => $message,
+            ];
+
+            if (count($messages) >= 10) {
+                break;
+            }
+        }
+
+        return $messages;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function readLogTailLines(string $path, int $maxLines, int $maxBytes): array
+    {
+        $handle = fopen($path, 'rb');
+        if ($handle === false) {
+            return [];
+        }
+
+        $fileSize = filesize($path);
+        if (! is_int($fileSize) || $fileSize <= 0) {
+            fclose($handle);
+
+            return [];
+        }
+
+        $seek = max(0, $fileSize - $maxBytes);
+        fseek($handle, $seek);
+        $buffer = stream_get_contents($handle);
+        fclose($handle);
+
+        if (! is_string($buffer) || $buffer === '') {
+            return [];
+        }
+
+        if ($seek > 0) {
+            $firstNewline = strpos($buffer, "\n");
+            if ($firstNewline !== false) {
+                $buffer = substr($buffer, $firstNewline + 1);
+            }
+        }
+
+        $lines = preg_split('/\r?\n/', trim($buffer));
+        if (! is_array($lines)) {
+            return [];
+        }
+
+        if (count($lines) > $maxLines) {
+            $lines = array_slice($lines, -$maxLines);
+        }
+
+        return array_values($lines);
+    }
+
+    private function extractLogTimestamp(string $line): ?string
+    {
+        if (preg_match('/^\[([^\]]+)\]/', $line, $matches) !== 1) {
+            return null;
+        }
+
+        return $matches[1] ?? null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function extractLogContext(string $line): ?array
+    {
+        $contextPos = strrpos($line, '{');
+        if ($contextPos === false) {
+            return null;
+        }
+
+        $context = substr($line, $contextPos);
+        if (! is_string($context) || $context === '') {
+            return null;
+        }
+
+        $decoded = json_decode($context, true);
+
+        return is_array($decoded) ? $decoded : null;
     }
 }

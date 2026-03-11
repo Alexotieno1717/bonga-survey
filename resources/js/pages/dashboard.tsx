@@ -37,6 +37,12 @@ interface RecentSurvey {
     contacts_count: number;
 }
 
+interface SmsOutboxEntry {
+    sent_at: string;
+    phone: string;
+    message: string;
+}
+
 const breadcrumbs: BreadcrumbItem[] = [
     {
         title: 'Dashboard',
@@ -64,10 +70,12 @@ function maxChartValue(chart: ChartPoint[]): number {
 }
 
 export default function Dashboard() {
-    const { surveyStats, statusChart, recentSurveys } = usePage().props as unknown as {
+    const { surveyStats, statusChart, recentSurveys, smsDriver, smsOutbox } = usePage().props as unknown as {
         surveyStats: SurveyStats;
         statusChart: ChartPoint[];
         recentSurveys: RecentSurvey[];
+        smsDriver: string;
+        smsOutbox: SmsOutboxEntry[];
     };
 
     const highestValue = maxChartValue(statusChart);
@@ -207,6 +215,33 @@ export default function Dashboard() {
                         </CardContent>
                     </Card>
                 </div>
+
+                {smsDriver === 'log' ? (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-lg">Local SMS Outbox</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {smsOutbox.length === 0 ? (
+                                <p className="text-sm text-muted-foreground">
+                                    No logged SMS messages yet.
+                                </p>
+                            ) : (
+                                smsOutbox.map((entry, index) => (
+                                    <div key={`${entry.sent_at}-${index}`} className="rounded-lg border p-3">
+                                        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                            <span>{entry.sent_at || 'Unknown time'}</span>
+                                            <span>{entry.phone}</span>
+                                        </div>
+                                        <p className="mt-2 text-sm text-slate-900">
+                                            {entry.message}
+                                        </p>
+                                    </div>
+                                ))
+                            )}
+                        </CardContent>
+                    </Card>
+                ) : null}
             </div>
         </AppLayout>
     );

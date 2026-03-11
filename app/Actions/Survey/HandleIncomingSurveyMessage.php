@@ -7,6 +7,9 @@ namespace App\Actions\Survey;
 use App\Models\Contact;
 use App\Models\Question;
 use App\Models\Survey;
+use App\Models\SurveyMessage;
+use App\Models\SurveyResponse;
+use App\Models\SurveyResponseAnswer;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
 
@@ -19,10 +22,11 @@ class HandleIncomingSurveyMessage
     /**
      * @return array{processed: bool, status: string, message: string}
      */
-    public function handle(string $phoneNumber, string $incomingMessage): array
+    public function handle(string $phoneNumber, string $incomingMessage, array $payload = []): array
     {
         $normalizedPhoneNumber = $this->normalizePhoneNumber($phoneNumber);
-        $normalizedMessage = mb_strtolower(trim($incomingMessage));
+        $rawMessage = trim($incomingMessage);
+        $normalizedMessage = mb_strtolower($rawMessage);
 
         if ($normalizedPhoneNumber === '' || $normalizedMessage === '') {
             return [
@@ -43,12 +47,19 @@ class HandleIncomingSurveyMessage
 
         $surveyWithActiveSession = $this->findSurveyWithActiveSession($contact);
         if ($surveyWithActiveSession instanceof Survey) {
+            $inboundMessageLog = $this->logInboundMessage($surveyWithActiveSession, $contact, $rawMessage, $payload);
             $triggerWord = mb_strtolower(trim((string) $surveyWithActiveSession->trigger_word));
             if ($this->messageMatchesTriggerWord($normalizedMessage, $triggerWord)) {
                 return $this->startSurveySession($contact, $surveyWithActiveSession);
             }
 
-            return $this->continueSurveySession($contact, $surveyWithActiveSession, $normalizedMessage);
+            return $this->continueSurveySession(
+                $contact,
+                $surveyWithActiveSession,
+                $normalizedMessage,
+                $rawMessage,
+                $inboundMessageLog,
+            );
         }
 
         $survey = $this->findSurveyByTriggerWord($contact, $normalizedMessage);
@@ -59,6 +70,8 @@ class HandleIncomingSurveyMessage
                 'message' => 'No active survey matched the incoming trigger word.',
             ];
         }
+
+        $this->logInboundMessage($survey, $contact, $rawMessage, $payload);
 
         return $this->startSurveySession($contact, $survey);
     }
@@ -112,8 +125,13 @@ class HandleIncomingSurveyMessage
     /**
      * @return array{processed: bool, status: string, message: string}
      */
-    private function continueSurveySession(Contact $contact, Survey $survey, string $normalizedMessage): array
-    {
+    private function continueSurveySession(
+        Contact $contact,
+        Survey $survey,
+        string $normalizedMessage,
+        string $rawMessage,
+        ?SurveyMessage $inboundMessageLog,
+    ): array {
         $sessionState = $this->decodeSessionState($survey);
         if ($sessionState === null) {
             return [
@@ -150,6 +168,8 @@ class HandleIncomingSurveyMessage
                 parentQuestions: $parentQuestions,
                 activeNode: $activeNode,
                 normalizedMessage: $normalizedMessage,
+                rawMessage: $rawMessage,
+                inboundMessageLog: $inboundMessageLog,
             );
         }
 
@@ -160,6 +180,8 @@ class HandleIncomingSurveyMessage
                 parentQuestions: $parentQuestions,
                 activeNode: $activeNode,
                 normalizedMessage: $normalizedMessage,
+                rawMessage: $rawMessage,
+                inboundMessageLog: $inboundMessageLog,
             );
         }
 
@@ -180,6 +202,8 @@ class HandleIncomingSurveyMessage
         Collection $parentQuestions,
         array $activeNode,
         string $normalizedMessage,
+        string $rawMessage,
+        ?SurveyMessage $inboundMessageLog,
     ): array {
         $currentQuestionIndex = (int) ($activeNode['question_index'] ?? -1);
         $question = $parentQuestions->get($currentQuestionIndex);
@@ -222,6 +246,22 @@ class HandleIncomingSurveyMessage
                 }
             }
         }
+
+        if ($selectedOptionIndex !== null) {
+            $selectedOption = $this->questionOptions($question)->get($selectedOptionIndex);
+            $this->updateInboundMessageResolvedOption(
+                $inboundMessageLog,
+                $selectedOption?->option !== null ? trim((string) $selectedOption->option) : null,
+            );
+        }
+
+        $this->recordParentAnswer(
+            survey: $survey,
+            contact: $contact,
+            question: $question,
+            selectedOptionIndex: $selectedOptionIndex,
+            rawMessage: $rawMessage,
+        );
 
         if ($question->response_type === 'multiple-choice' && ! $question->allow_multiple && $selectedOptionIndex !== null) {
             $option = $this->questionOptions($question)->get($selectedOptionIndex);
@@ -293,6 +333,8 @@ class HandleIncomingSurveyMessage
         Collection $parentQuestions,
         array $activeNode,
         string $normalizedMessage,
+        string $rawMessage,
+        ?SurveyMessage $inboundMessageLog,
     ): array {
         $parentQuestionIndex = (int) ($activeNode['parent_question_index'] ?? -1);
         $optionIndex = (int) ($activeNode['option_index'] ?? -1);
@@ -357,6 +399,11 @@ class HandleIncomingSurveyMessage
                     ];
                 }
             }
+        }
+
+        if ($selectedChildOptionIndex !== null) {
+            $selectedText = $childOptionTexts[$selectedChildOptionIndex] ?? null;
+            $this->updateInboundMessageResolvedOption($inboundMessageLog, $selectedText);
         }
 
         $nextChildQuestionIndex = $this->resolveNextChildQuestionIndex(
@@ -505,12 +552,76 @@ class HandleIncomingSurveyMessage
         }
 
         $this->markSessionCompleted($survey, $contact);
+        $this->markResponseCompleted($survey, $contact);
 
         return [
             'processed' => true,
             'status' => 'survey_completed',
             'message' => 'Survey completed successfully.',
         ];
+    }
+
+    private function recordParentAnswer(
+        Survey $survey,
+        Contact $contact,
+        Question $question,
+        ?int $selectedOptionIndex,
+        string $rawMessage,
+    ): void {
+        if ($question->response_type === 'multiple-choice' && $selectedOptionIndex === null) {
+            return;
+        }
+
+        $response = SurveyResponse::query()->firstOrCreate(
+            [
+                'survey_id' => $survey->id,
+                'contact_id' => $contact->id,
+            ],
+            [
+                'started_at' => now(),
+            ],
+        );
+
+        if ($response->started_at === null) {
+            $response->update([
+                'started_at' => now(),
+            ]);
+        }
+
+        $optionId = null;
+        $answerText = null;
+
+        if ($question->response_type === 'multiple-choice') {
+            $option = $this->questionOptions($question)->get($selectedOptionIndex ?? -1);
+            $optionId = $option?->id;
+
+            if ($optionId === null) {
+                return;
+            }
+        } else {
+            $answerText = trim($rawMessage);
+        }
+
+        SurveyResponseAnswer::query()->updateOrCreate(
+            [
+                'survey_response_id' => $response->id,
+                'question_id' => $question->id,
+            ],
+            [
+                'option_id' => $optionId,
+                'answer_text' => $answerText,
+            ],
+        );
+    }
+
+    private function markResponseCompleted(Survey $survey, Contact $contact): void
+    {
+        SurveyResponse::query()
+            ->where('survey_id', $survey->id)
+            ->where('contact_id', $contact->id)
+            ->update([
+                'completed_at' => now(),
+            ]);
     }
 
     private function findContactByPhone(string $normalizedPhoneNumber): ?Contact
@@ -997,7 +1108,16 @@ class HandleIncomingSurveyMessage
      */
     private function sendSurveyMessage(Survey $survey, Contact $contact, string $message, string $failureMessage): array
     {
+        $messageLog = $this->logOutboundMessage($survey, $contact, $message);
+
         $result = $this->sendSmsMessage->handle((string) $contact->phone, $message);
+
+        if ($messageLog !== null) {
+            $messageLog->update([
+                'delivery_status' => $result['successful'] ? 'sent' : 'failed',
+                'provider_message_id' => $result['unique_id'],
+            ]);
+        }
 
         if (! $result['successful']) {
             Log::warning($failureMessage, [
@@ -1010,5 +1130,58 @@ class HandleIncomingSurveyMessage
         }
 
         return $result;
+    }
+
+    private function logInboundMessage(Survey $survey, Contact $contact, string $message, array $payload = []): ?SurveyMessage
+    {
+        $normalized = trim($message);
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        return SurveyMessage::query()->create([
+            'survey_id' => $survey->id,
+            'contact_id' => $contact->id,
+            'direction' => 'inbound',
+            'phone' => (string) $contact->phone,
+            'delivery_status' => 'received',
+            'message' => $normalized,
+            'payload' => $payload === [] ? null : $payload,
+        ]);
+    }
+
+    private function logOutboundMessage(Survey $survey, Contact $contact, string $message): ?SurveyMessage
+    {
+        $normalized = trim($message);
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        return SurveyMessage::query()->create([
+            'survey_id' => $survey->id,
+            'contact_id' => $contact->id,
+            'direction' => 'outbound',
+            'phone' => (string) $contact->phone,
+            'delivery_status' => 'queued',
+            'message' => $normalized,
+        ]);
+    }
+
+    private function updateInboundMessageResolvedOption(?SurveyMessage $messageLog, ?string $resolvedOption): void
+    {
+        if ($messageLog === null) {
+            return;
+        }
+
+        $normalized = trim((string) $resolvedOption);
+        if ($normalized === '') {
+            return;
+        }
+
+        $messageLog->update([
+            'resolved_option_text' => $normalized,
+        ]);
     }
 }

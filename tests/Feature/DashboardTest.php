@@ -86,3 +86,27 @@ test('dashboard shows survey metrics and chart data', function (): void {
     expect($activeSurvey->exists)->toBeTrue();
     expect($completedSurvey->exists)->toBeTrue();
 });
+
+test('dashboard exposes local sms outbox when log driver is enabled', function (): void {
+    config()->set('services.sms.driver', 'log');
+
+    $logPath = storage_path('logs/laravel.log');
+    file_put_contents($logPath, '');
+
+    $logLine = '[2026-03-10 11:20:00] local.INFO: SMS message logged locally. {"phone":"254700000000","message":"Outbox test message"}';
+    file_put_contents($logPath, $logLine.PHP_EOL, FILE_APPEND);
+
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->get(route('dashboard'));
+
+    $response
+        ->assertOk()
+        ->assertInertia(fn (Assert $page): Assert => $page
+            ->component('dashboard')
+            ->where('smsDriver', 'log')
+            ->has('smsOutbox', 1)
+            ->where('smsOutbox.0.phone', '254700000000')
+            ->where('smsOutbox.0.message', 'Outbox test message')
+        );
+});

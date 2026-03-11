@@ -37,7 +37,7 @@ class SurveySmsWebhookController extends Controller
             'content',
             'sms',
         ]);
-        $result = $this->handleIncomingSurveyMessage->handle($phoneNumber, $message);
+        $result = $this->handleIncomingSurveyMessage->handle($phoneNumber, $message, $payload);
 
         Log::info('Inbound SMS webhook processed.', [
             'phone' => $phoneNumber,

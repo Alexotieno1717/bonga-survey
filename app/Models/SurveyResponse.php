@@ -4,29 +4,26 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use Database\Factories\QuestionFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Question extends Model
+class SurveyResponse extends Model
 {
-    /** @use HasFactory<QuestionFactory> */
+    /** @use HasFactory<\Database\Factories\SurveyResponseFactory> */
     use HasFactory;
 
     protected $fillable = [
         'survey_id',
-        'question',
-        'response_type',
-        'free_text_description',
-        'allow_multiple',
-        'order',
-        'branching',
+        'contact_id',
+        'started_at',
+        'completed_at',
     ];
 
     protected $casts = [
-        'branching' => 'array',
+        'started_at' => 'datetime',
+        'completed_at' => 'datetime',
     ];
 
     public function survey(): BelongsTo
@@ -34,12 +31,12 @@ class Question extends Model
         return $this->belongsTo(Survey::class);
     }
 
-    public function options(): HasMany
+    public function contact(): BelongsTo
     {
-        return $this->hasMany(Option::class)->orderBy('order');
+        return $this->belongsTo(Contact::class);
     }
 
-    public function responseAnswers(): HasMany
+    public function answers(): HasMany
     {
         return $this->hasMany(SurveyResponseAnswer::class);
     }

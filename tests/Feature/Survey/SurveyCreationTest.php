@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 use App\Models\Contact;
 use App\Models\Survey;
+use App\Models\SurveyMessage;
+use App\Models\SurveyResponse;
+use App\Models\SurveyResponseAnswer;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
@@ -366,6 +369,313 @@ test('survey responses page is scoped to owner and returns paginated recipients'
 
     $forbiddenResponse = $this->actingAs($otherUser)->get(route('surveys.responses', $survey));
     $forbiddenResponse->assertNotFound();
+});
+
+test('survey responses page tracks completion and response status', function (): void {
+    $owner = User::factory()->create();
+
+    $survey = Survey::query()->create([
+        'name' => 'Completion Survey',
+        'description' => 'Survey with completion tracking',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDays(7)->toDateString(),
+        'trigger_word' => 'COMPLETE-TRACK',
+        'completion_message' => null,
+        'invitation_message' => 'Reply START',
+        'scheduled_time' => now()->addDay(),
+        'status' => 'active',
+        'created_by' => $owner->id,
+    ]);
+
+    $pendingContact = Contact::factory()->create([
+        'user_id' => $owner->id,
+        'names' => 'Alpha',
+    ]);
+    $awaitingContact = Contact::factory()->create([
+        'user_id' => $owner->id,
+        'names' => 'Bravo',
+    ]);
+    $inProgressContact = Contact::factory()->create([
+        'user_id' => $owner->id,
+        'names' => 'Charlie',
+    ]);
+    $completedContact = Contact::factory()->create([
+        'user_id' => $owner->id,
+        'names' => 'Delta',
+    ]);
+
+    $survey->contacts()->attach($pendingContact->id, [
+        'sent_at' => null,
+    ]);
+    $survey->contacts()->attach($awaitingContact->id, [
+        'sent_at' => now(),
+    ]);
+    $survey->contacts()->attach($inProgressContact->id, [
+        'sent_at' => now(),
+        'sms_flow_started_at' => now(),
+    ]);
+    $survey->contacts()->attach($completedContact->id, [
+        'sent_at' => now(),
+        'sms_flow_started_at' => now(),
+        'sms_flow_completed_at' => now(),
+    ]);
+
+    $response = $this->actingAs($owner)->get(route('surveys.responses', $survey));
+
+    $response
+        ->assertOk()
+        ->assertInertia(fn (Assert $page): Assert => $page
+            ->component('surveys/question/Responses')
+            ->where('stats.sent_recipients', 3)
+            ->where('stats.pending_recipients', 1)
+            ->where('stats.started_recipients', 2)
+            ->where('stats.completed_recipients', 1)
+            ->where('stats.response_count', 2)
+            ->where('recipients.data.0.names', 'Alpha')
+            ->where('recipients.data.0.response_status', 'pending_send')
+            ->where('recipients.data.1.names', 'Bravo')
+            ->where('recipients.data.1.response_status', 'awaiting_response')
+            ->where('recipients.data.2.names', 'Charlie')
+            ->where('recipients.data.2.response_status', 'in_progress')
+            ->where('recipients.data.3.names', 'Delta')
+            ->where('recipients.data.3.response_status', 'completed')
+        );
+});
+
+test('survey responses page aggregates per-question answers', function (): void {
+    $owner = User::factory()->create();
+
+    $survey = Survey::query()->create([
+        'name' => 'Analytics Survey',
+        'description' => 'Tracks per-question counts',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDays(7)->toDateString(),
+        'trigger_word' => 'ANALYTICS',
+        'completion_message' => null,
+        'invitation_message' => 'Reply START',
+        'scheduled_time' => now()->addDay(),
+        'status' => 'active',
+        'created_by' => $owner->id,
+    ]);
+
+    $freeTextQuestion = $survey->questions()->create([
+        'question' => 'Which type of car do you own?',
+        'response_type' => 'free-text',
+        'free_text_description' => null,
+        'allow_multiple' => false,
+        'order' => 0,
+        'branching' => null,
+    ]);
+
+    $choiceQuestion = $survey->questions()->create([
+        'question' => 'What fuel do you use?',
+        'response_type' => 'multiple-choice',
+        'free_text_description' => null,
+        'allow_multiple' => false,
+        'order' => 1,
+        'branching' => null,
+    ]);
+
+    $choiceQuestion->options()->createMany([
+        ['option' => 'Petrol', 'order' => 0, 'branching' => null],
+        ['option' => 'Diesel', 'order' => 1, 'branching' => null],
+    ]);
+
+    $contacts = Contact::factory()->count(2)->create([
+        'user_id' => $owner->id,
+    ]);
+
+    foreach ($contacts as $contact) {
+        $survey->contacts()->attach($contact->id, [
+            'sent_at' => now(),
+        ]);
+    }
+
+    $responses = $contacts->map(function (Contact $contact) use ($survey): SurveyResponse {
+        return SurveyResponse::query()->create([
+            'survey_id' => $survey->id,
+            'contact_id' => $contact->id,
+            'started_at' => now(),
+        ]);
+    });
+
+    SurveyResponseAnswer::query()->create([
+        'survey_response_id' => $responses[0]->id,
+        'question_id' => $freeTextQuestion->id,
+        'answer_text' => 'SUV',
+    ]);
+
+    SurveyResponseAnswer::query()->create([
+        'survey_response_id' => $responses[0]->id,
+        'question_id' => $choiceQuestion->id,
+        'option_id' => $choiceQuestion->options()->orderBy('order')->first()?->id,
+    ]);
+
+    SurveyResponseAnswer::query()->create([
+        'survey_response_id' => $responses[1]->id,
+        'question_id' => $freeTextQuestion->id,
+        'answer_text' => 'Sedan',
+    ]);
+
+    SurveyResponseAnswer::query()->create([
+        'survey_response_id' => $responses[1]->id,
+        'question_id' => $choiceQuestion->id,
+        'option_id' => $choiceQuestion->options()->orderBy('order')->skip(1)->first()?->id,
+    ]);
+
+    $response = $this->actingAs($owner)->get(route('surveys.responses', $survey));
+
+    $response
+        ->assertOk()
+        ->assertInertia(fn (Assert $page): Assert => $page
+            ->component('surveys/question/Responses')
+            ->where('question_analytics.0.id', $freeTextQuestion->id)
+            ->where('question_analytics.0.total_responses', 2)
+            ->where('question_analytics.0.free_text_count', 2)
+            ->where('question_analytics.1.id', $choiceQuestion->id)
+            ->where('question_analytics.1.total_responses', 2)
+            ->where('question_analytics.1.options.0.count', 1)
+            ->where('question_analytics.1.options.1.count', 1)
+        );
+});
+
+test('survey response detail page shows answers for a recipient', function (): void {
+    $owner = User::factory()->create();
+
+    $survey = Survey::query()->create([
+        'name' => 'Detail Survey',
+        'description' => 'Single response details',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDays(7)->toDateString(),
+        'trigger_word' => 'DETAILS',
+        'completion_message' => null,
+        'invitation_message' => 'Reply START',
+        'scheduled_time' => now()->addDay(),
+        'status' => 'active',
+        'created_by' => $owner->id,
+    ]);
+
+    $question = $survey->questions()->create([
+        'question' => 'Which type of car do you own?',
+        'response_type' => 'free-text',
+        'free_text_description' => null,
+        'allow_multiple' => false,
+        'order' => 0,
+        'branching' => null,
+    ]);
+
+    $contact = Contact::factory()->create([
+        'user_id' => $owner->id,
+        'names' => 'Jane Doe',
+    ]);
+
+    $survey->contacts()->attach($contact->id, [
+        'sent_at' => now(),
+        'sms_flow_started_at' => now(),
+    ]);
+
+    $response = SurveyResponse::query()->create([
+        'survey_id' => $survey->id,
+        'contact_id' => $contact->id,
+        'started_at' => now(),
+    ]);
+
+    SurveyResponseAnswer::query()->create([
+        'survey_response_id' => $response->id,
+        'question_id' => $question->id,
+        'answer_text' => 'SUV',
+    ]);
+
+    SurveyMessage::query()->create([
+        'survey_id' => $survey->id,
+        'contact_id' => $contact->id,
+        'direction' => 'outbound',
+        'phone' => '254700000000',
+        'delivery_status' => 'sent',
+        'message' => 'Q1: Which type of car do you own?',
+    ]);
+
+    SurveyMessage::query()->create([
+        'survey_id' => $survey->id,
+        'contact_id' => $contact->id,
+        'direction' => 'inbound',
+        'phone' => '254700000000',
+        'delivery_status' => 'received',
+        'resolved_option_text' => 'SUV',
+        'message' => 'SUV',
+    ]);
+
+    $detailResponse = $this->actingAs($owner)->get(route('surveys.responses.show', [$survey, $contact]));
+
+    $detailResponse
+        ->assertOk()
+        ->assertInertia(fn (Assert $page): Assert => $page
+            ->component('surveys/question/ResponseDetail')
+            ->where('recipient.names', 'Jane Doe')
+            ->where('response.answers.0.question', 'Which type of car do you own?')
+            ->where('response.answers.0.answer', 'SUV')
+            ->where('response.messages.0.direction', 'outbound')
+            ->where('response.messages.0.delivery_status', 'sent')
+            ->where('response.messages.1.direction', 'inbound')
+            ->where('response.messages.1.delivery_status', 'received')
+            ->where('response.messages.1.resolved_option_text', 'SUV')
+        );
+});
+
+test('survey answers export includes per-question columns', function (): void {
+    $owner = User::factory()->create();
+
+    $survey = Survey::query()->create([
+        'name' => 'Export Survey',
+        'description' => 'Exports answers',
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addDays(7)->toDateString(),
+        'trigger_word' => 'EXPORT',
+        'completion_message' => null,
+        'invitation_message' => 'Reply START',
+        'scheduled_time' => now()->addDay(),
+        'status' => 'active',
+        'created_by' => $owner->id,
+    ]);
+
+    $question = $survey->questions()->create([
+        'question' => 'Which type of car do you own?',
+        'response_type' => 'free-text',
+        'free_text_description' => null,
+        'allow_multiple' => false,
+        'order' => 0,
+        'branching' => null,
+    ]);
+
+    $contact = Contact::factory()->create([
+        'user_id' => $owner->id,
+        'names' => 'Jane Doe',
+        'phone' => '254700000000',
+    ]);
+
+    $survey->contacts()->attach($contact->id, [
+        'sent_at' => now(),
+    ]);
+
+    $response = SurveyResponse::query()->create([
+        'survey_id' => $survey->id,
+        'contact_id' => $contact->id,
+        'started_at' => now(),
+    ]);
+
+    SurveyResponseAnswer::query()->create([
+        'survey_response_id' => $response->id,
+        'question_id' => $question->id,
+        'answer_text' => 'SUV',
+    ]);
+
+    $exportResponse = $this->actingAs($owner)->get(route('surveys.responses', $survey).'?export=answers_csv');
+
+    $content = $exportResponse->streamedContent();
+
+    expect($content)->toContain('Q1: Which type of car do you own?');
+    expect($content)->toContain('Jane Doe');
+    expect($content)->toContain('SUV');
 });
 
 test('survey responses index is scoped and paginated for authenticated user', function (): void {

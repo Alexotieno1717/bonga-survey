@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Survey;
 
 use App\Models\Survey;
+use App\Models\SurveyMessage;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Facades\Log;
@@ -85,6 +86,14 @@ class DispatchSurveyInvitations
                 }
 
                 $successful++;
+                SurveyMessage::query()->create([
+                    'survey_id' => $survey->id,
+                    'contact_id' => $contact->id,
+                    'direction' => 'outbound',
+                    'phone' => (string) $contact->phone,
+                    'delivery_status' => $result['successful'] ? 'sent' : 'failed',
+                    'message' => $invitationMessage,
+                ]);
                 $survey->contacts()->updateExistingPivot($contact->id, [
                     'invitation_dispatched_at' => now(),
                     'updated_at' => now(),

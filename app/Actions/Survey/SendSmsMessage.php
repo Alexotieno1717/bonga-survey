@@ -7,6 +7,7 @@ namespace App\Actions\Survey;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class SendSmsMessage
 {
@@ -20,6 +21,21 @@ class SendSmsMessage
      */
     public function handle(string $phoneNumber, string $message): array
     {
+        $driver = (string) config('services.sms.driver', 'http');
+        if ($driver === 'log') {
+            Log::info('SMS message logged locally.', [
+                'phone' => $phoneNumber,
+                'message' => $message,
+            ]);
+
+            return [
+                'successful' => true,
+                'status' => 222,
+                'status_message' => 'SMS logged locally.',
+                'unique_id' => (string) Str::uuid(),
+            ];
+        }
+
         $apiUrl = (string) config('services.sms.url', '');
         $apiClientId = (string) config('services.sms.client_id', '');
         $apiKey = (string) config('services.sms.key', '');

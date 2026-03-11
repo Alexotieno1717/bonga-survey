@@ -37,6 +37,7 @@ Route::patch('surveys/{survey}/cancel', [SurveyController::class, 'cancel'])->mi
 Route::patch('surveys/{survey}/reactivate', [SurveyController::class, 'reactivate'])->middleware(['auth'])->name('surveys.reactivate');
 Route::delete('surveys/{survey}', [SurveyController::class, 'destroy'])->middleware(['auth'])->name('surveys.destroy');
 Route::get('surveys/{survey}/responses', [SurveyController::class, 'responses'])->middleware(['auth'])->name('surveys.responses');
+Route::get('surveys/{survey}/responses/{contact}', [SurveyController::class, 'responseDetail'])->middleware(['auth'])->name('surveys.responses.show');
 
 Route::get('phonebook/contact', [contactController::class, 'index'])->name('contact.index')->middleware(['auth']);
 Route::get('phonebook/contact/create', [contactController::class, 'create'])->name('contact.create')->middleware(['auth']);

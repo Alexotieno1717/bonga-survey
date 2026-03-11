@@ -37,6 +37,8 @@ interface ResponseStats {
     sent_recipients: number;
     pending_recipients: number;
     response_count: number;
+    started_recipients: number;
+    completed_recipients: number;
     completion_rate: number;
 }
 
@@ -81,7 +83,7 @@ interface RecipientRow {
     email: string | null;
     group_name: string | null;
     sent_at: string | null;
-    response_status: 'awaiting_response' | 'pending_send';
+    response_status: 'awaiting_response' | 'pending_send' | 'in_progress' | 'completed';
     timeline: {
         invited_at: string | null;
         sent_at: string | null;
@@ -120,7 +122,7 @@ interface PageProps extends InertiaPageProps {
     groups: GroupOption[];
     filters: {
         search: string;
-        status: 'all' | 'sent' | 'pending';
+        status: 'all' | 'sent' | 'pending' | 'awaiting' | 'in_progress' | 'completed';
         date_from: string | null;
         date_to: string | null;
         group_id: number | null;
@@ -150,6 +152,23 @@ function toPercent(value: number, total: number): number {
     }
 
     return Math.round((value / total) * 100);
+}
+
+function responseStatusBadge(status: RecipientRow['response_status']): {
+    label: string;
+    className?: string;
+    variant?: 'outline' | 'default' | 'secondary';
+} {
+    switch (status) {
+        case 'completed':
+            return { label: 'Completed', className: 'bg-emerald-100 text-emerald-700' };
+        case 'in_progress':
+            return { label: 'In progress', className: 'bg-blue-100 text-blue-700' };
+        case 'awaiting_response':
+            return { label: 'Awaiting response', className: 'bg-amber-100 text-amber-700' };
+        default:
+            return { label: 'Pending send', variant: 'outline' };
+    }
 }
 
 export default function Responses() {
@@ -279,6 +298,18 @@ export default function Responses() {
                                     Export Excel
                                 </Button>
                             </Link>
+                            <Link href={surveysRoutes.responses(survey.id, { query: { ...exportQuery, export: 'answers_csv' } }).url}>
+                                <Button type="button" variant="outline">
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Export Answers CSV
+                                </Button>
+                            </Link>
+                            <Link href={surveysRoutes.responses(survey.id, { query: { ...exportQuery, export: 'answers_xlsx' } }).url}>
+                                <Button type="button" variant="outline">
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Export Answers Excel
+                                </Button>
+                            </Link>
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -297,6 +328,9 @@ export default function Responses() {
                                 <option value="all">All status</option>
                                 <option value="sent">Sent only</option>
                                 <option value="pending">Pending only</option>
+                                <option value="awaiting">Awaiting response</option>
+                                <option value="in_progress">In progress</option>
+                                <option value="completed">Completed</option>
                             </select>
                             <select
                                 name="group_id"
@@ -370,13 +404,13 @@ export default function Responses() {
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <BarChart3 className="h-4 w-4" />
-                                Responses Received
+                                Responses Started
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <p className="text-2xl font-semibold">{stats.response_count}</p>
                             <p className="text-xs text-muted-foreground">
-                                Completion rate: {stats.completion_rate}%
+                                Completed: {stats.completed_recipients} • Rate: {stats.completion_rate}%
                             </p>
                         </CardContent>
                     </Card>
@@ -518,14 +552,24 @@ export default function Responses() {
                                             <td className="px-4 py-3 text-sm text-slate-800">
                                                 <p className="font-medium">{recipient.names}</p>
                                                 <p className="text-xs text-slate-500">{recipient.phone} • {recipient.email || '-'}</p>
+                                                <Link
+                                                    href={`${surveysRoutes.responses(survey.id).url}/${recipient.id}`}
+                                                    className="mt-1 inline-flex text-xs font-medium text-blue-600 hover:underline"
+                                                >
+                                                    View responses
+                                                </Link>
                                             </td>
                                             <td className="px-4 py-3 text-sm text-slate-700">{recipient.group_name || '-'}</td>
                                             <td className="px-4 py-3">
-                                                {recipient.response_status === 'awaiting_response' ? (
-                                                    <Badge className="bg-amber-100 text-amber-700">Awaiting response</Badge>
-                                                ) : (
-                                                    <Badge variant="outline">Pending send</Badge>
-                                                )}
+                                                {(() => {
+                                                    const badge = responseStatusBadge(recipient.response_status);
+
+                                                    return (
+                                                        <Badge variant={badge.variant} className={badge.className}>
+                                                            {badge.label}
+                                                        </Badge>
+                                                    );
+                                                })()}
                                             </td>
                                             <td className="px-4 py-3 text-xs text-slate-600">
                                                 <div className="space-y-1">
@@ -583,8 +627,8 @@ export default function Responses() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 gap-2 text-sm text-muted-foreground md:grid-cols-2">
-                        <p>Reply/delivery/completion values are currently placeholders until inbound SMS response tracking is integrated.</p>
-                        <p>The filtering and export pipeline is live and ready for response-event data when added.</p>
+                        <p>Reply/completion statuses are derived from SMS flow start/completion timestamps.</p>
+                        <p>Per-question analytics remain placeholders until answer storage is implemented.</p>
                     </CardContent>
                 </Card>
             </div>

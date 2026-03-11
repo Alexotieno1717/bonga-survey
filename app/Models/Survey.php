@@ -40,6 +40,16 @@ class Survey extends Model
         return $this->hasMany(Question::class)->orderBy('order');
     }
 
+    public function responses(): HasMany
+    {
+        return $this->hasMany(SurveyResponse::class);
+    }
+
+    public function messages(): HasMany
+    {
+        return $this->hasMany(SurveyMessage::class);
+    }
+
     public function contacts(): BelongsToMany
     {
         return $this->belongsToMany(Contact::class, 'contact_survey')

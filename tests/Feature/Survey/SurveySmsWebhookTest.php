@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 use App\Models\Contact;
 use App\Models\Survey;
+use App\Models\SurveyMessage;
+use App\Models\SurveyResponse;
+use App\Models\SurveyResponseAnswer;
 use App\Models\User;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\DB;
@@ -89,6 +92,26 @@ test('inbound trigger dispatches first question for matching active survey conta
             && str_contains($message, '2. Not satisfied')
             && $phone === '+254748815593';
     });
+
+    $inboundLog = SurveyMessage::query()
+        ->where('survey_id', $survey->id)
+        ->where('contact_id', $contact->id)
+        ->where('direction', 'inbound')
+        ->first();
+
+    expect($inboundLog)->not->toBeNull();
+    expect($inboundLog?->payload)->toMatchArray([
+        'MSISDN' => '254748815593',
+        'txtMessage' => 'start',
+    ]);
+
+    $outboundLog = SurveyMessage::query()
+        ->where('survey_id', $survey->id)
+        ->where('contact_id', $contact->id)
+        ->where('direction', 'outbound')
+        ->first();
+
+    expect($outboundLog?->provider_message_id)->toBe('sms-1001');
 });
 
 test('inbound message with non-matching trigger does not dispatch question', function (): void {
@@ -258,6 +281,24 @@ test('inbound replies progress through parent questions and send completion mess
     expect($pivot)->not->toBeNull();
     expect($pivot?->sms_flow_state)->toBeNull();
     expect($pivot?->sms_flow_completed_at)->not->toBeNull();
+
+    $surveyResponse = SurveyResponse::query()
+        ->where('survey_id', $survey->id)
+        ->where('contact_id', $contact->id)
+        ->first();
+
+    expect($surveyResponse)->not->toBeNull();
+    expect($surveyResponse?->completed_at)->not->toBeNull();
+
+    $answers = SurveyResponseAnswer::query()
+        ->where('survey_response_id', $surveyResponse?->id)
+        ->orderBy('question_id')
+        ->get();
+
+    expect($answers)->toHaveCount(2);
+    expect($answers[0]->question_id)->toBe($firstQuestion->id);
+    expect($answers[0]->option_id)->toBe($firstQuestion->options()->orderBy('order')->first()?->id);
+    expect($answers[1]->answer_text)->toBe('Support is responsive');
 });
 
 test('inbound replies progress through child question flow like simulator', function (): void {

@@ -12,6 +12,9 @@ use App\Models\Contact;
 use App\Models\ContactGroup;
 use App\Models\Question;
 use App\Models\Survey;
+use App\Models\SurveyMessage;
+use App\Models\SurveyResponse;
+use App\Models\SurveyResponseAnswer;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Http\RedirectResponse;
@@ -374,7 +377,7 @@ class SurveyController extends Controller
         $groupId = $request->integer('group_id');
         $exportFormat = (string) $request->string('export');
 
-        if (! in_array($status, ['all', 'sent', 'pending'], true)) {
+        if (! in_array($status, ['all', 'sent', 'pending', 'awaiting', 'in_progress', 'completed'], true)) {
             $status = 'all';
         }
 
@@ -407,6 +410,17 @@ class SurveyController extends Controller
             ->when($status === 'pending', function (Builder $query): void {
                 $query->whereNull('contact_survey.sent_at');
             })
+            ->when($status === 'awaiting', function (Builder $query): void {
+                $query->whereNotNull('contact_survey.sent_at')
+                    ->whereNull('contact_survey.sms_flow_started_at');
+            })
+            ->when($status === 'in_progress', function (Builder $query): void {
+                $query->whereNotNull('contact_survey.sms_flow_started_at')
+                    ->whereNull('contact_survey.sms_flow_completed_at');
+            })
+            ->when($status === 'completed', function (Builder $query): void {
+                $query->whereNotNull('contact_survey.sms_flow_completed_at');
+            })
             ->when($dateFrom !== null, function (Builder $query) use ($dateFrom): void {
                 $query->whereDate('contact_survey.sent_at', '>=', $dateFrom);
             })
@@ -414,10 +428,16 @@ class SurveyController extends Controller
                 $query->whereDate('contact_survey.sent_at', '<=', $dateTo);
             }));
 
-        if (in_array($exportFormat, ['csv', 'xlsx'], true)) {
+        if (in_array($exportFormat, ['csv', 'xlsx', 'answers_csv', 'answers_xlsx'], true)) {
             $allRecipients = $baseRecipientsQuery()
                 ->orderBy('contacts.names')
                 ->get();
+
+            if (str_starts_with($exportFormat, 'answers_')) {
+                $format = str_replace('answers_', '', $exportFormat);
+
+                return $this->exportAnswers($survey, $allRecipients, $format);
+            }
 
             return $this->exportResponses($survey, $allRecipients, $exportFormat);
         }
@@ -428,11 +448,15 @@ class SurveyController extends Controller
             ->count();
         $pendingRecipients = max(0, $totalRecipients - $sentRecipients);
 
-        $responseCount = 0;
-        $startedCount = $responseCount;
-        $completedCount = $responseCount;
-        $completionRate = $totalRecipients > 0
-            ? round(($completedCount / $totalRecipients) * 100, 2)
+        $startedCount = $baseRecipientsQuery()
+            ->whereNotNull('contact_survey.sms_flow_started_at')
+            ->count();
+        $completedCount = $baseRecipientsQuery()
+            ->whereNotNull('contact_survey.sms_flow_completed_at')
+            ->count();
+        $responseCount = $startedCount;
+        $completionRate = $sentRecipients > 0
+            ? round(($completedCount / $sentRecipients) * 100, 2)
             : 0;
 
         $invalidPhoneCount = $baseRecipientsQuery()
@@ -462,37 +486,74 @@ class SurveyController extends Controller
             ->orderByRaw('DATE(contact_survey.sent_at)')
             ->get()
             ->pluck('total', 'day');
+        $responseSeries = $baseRecipientsQuery()
+            ->whereNotNull('contact_survey.sms_flow_started_at')
+            ->selectRaw('DATE(contact_survey.sms_flow_started_at) as day, COUNT(*) as total')
+            ->groupByRaw('DATE(contact_survey.sms_flow_started_at)')
+            ->orderByRaw('DATE(contact_survey.sms_flow_started_at)')
+            ->get()
+            ->pluck('total', 'day');
 
         $today = now()->startOfDay();
         $timeSeries = collect(range(6, 0))
-            ->map(function (int $daysAgo) use ($today, $sentSeries): array {
+            ->map(function (int $daysAgo) use ($today, $sentSeries, $responseSeries): array {
                 $date = $today->copy()->subDays($daysAgo)->toDateString();
 
                 return [
                     'date' => $date,
                     'label' => $today->copy()->subDays($daysAgo)->format('M d'),
                     'invitations_sent' => (int) ($sentSeries[$date] ?? 0),
-                    'responses_received' => 0,
+                    'responses_received' => (int) ($responseSeries[$date] ?? 0),
                 ];
             })
             ->values()
             ->all();
 
+        $recipientIds = $baseRecipientsQuery()
+            ->pluck('contacts.id')
+            ->all();
+
+        if ($recipientIds === []) {
+            $answers = collect();
+        } else {
+            $answers = SurveyResponseAnswer::query()
+                ->select('survey_response_answers.question_id', 'survey_response_answers.option_id', 'survey_response_answers.answer_text')
+                ->whereHas('response', function (Builder $query) use ($survey, $recipientIds): void {
+                    $query->where('survey_id', $survey->id)
+                        ->whereIn('contact_id', $recipientIds);
+                })
+                ->get()
+                ->groupBy('question_id');
+        }
+
         $questionAnalytics = $survey->questions
-            ->map(fn ($question): array => [
-                'id' => $question->id,
-                'question' => $question->question,
-                'response_type' => $question->response_type,
-                'total_responses' => 0,
-                'free_text_count' => $question->response_type === 'free-text' ? 0 : null,
-                'options' => $question->options
-                    ->map(fn ($option): array => [
-                        'id' => $option->id,
-                        'option' => $option->option,
-                        'count' => 0,
-                    ])
-                    ->all(),
-            ])
+            ->map(function ($question) use ($answers): array {
+                $questionAnswers = $answers->get($question->id, collect());
+                $totalResponses = $questionAnswers->count();
+                $optionCounts = $questionAnswers
+                    ->whereNotNull('option_id')
+                    ->groupBy('option_id')
+                    ->map(fn ($items): int => $items->count());
+
+                return [
+                    'id' => $question->id,
+                    'question' => $question->question,
+                    'response_type' => $question->response_type,
+                    'total_responses' => $totalResponses,
+                    'free_text_count' => $question->response_type === 'free-text'
+                        ? $questionAnswers
+                            ->filter(fn ($answer): bool => is_string($answer->answer_text) && trim($answer->answer_text) !== '')
+                            ->count()
+                        : null,
+                    'options' => $question->options
+                        ->map(fn ($option): array => [
+                            'id' => $option->id,
+                            'option' => $option->option,
+                            'count' => (int) ($optionCounts[$option->id] ?? 0),
+                        ])
+                        ->all(),
+                ];
+            })
             ->values()
             ->all();
 
@@ -502,6 +563,21 @@ class SurveyController extends Controller
             ->withQueryString()
             ->through(function ($contact) use ($survey): array {
                 $sentAt = $contact->pivot?->sent_at;
+                $startedAt = $contact->pivot?->sms_flow_started_at;
+                $completedAt = $contact->pivot?->sms_flow_completed_at;
+                $responseStatus = 'pending_send';
+
+                if ($sentAt !== null) {
+                    $responseStatus = 'awaiting_response';
+                }
+
+                if ($startedAt !== null) {
+                    $responseStatus = 'in_progress';
+                }
+
+                if ($completedAt !== null) {
+                    $responseStatus = 'completed';
+                }
 
                 return [
                     'id' => $contact->id,
@@ -514,10 +590,10 @@ class SurveyController extends Controller
                         'invited_at' => $survey->created_at,
                         'sent_at' => $sentAt,
                         'delivered_at' => $sentAt,
-                        'replied_at' => null,
-                        'completed_at' => null,
+                        'replied_at' => $startedAt,
+                        'completed_at' => $completedAt,
                     ],
-                    'response_status' => $sentAt ? 'awaiting_response' : 'pending_send',
+                    'response_status' => $responseStatus,
                 ];
             });
 
@@ -544,10 +620,12 @@ class SurveyController extends Controller
                 'sent_recipients' => $sentRecipients,
                 'pending_recipients' => $pendingRecipients,
                 'response_count' => $responseCount,
+                'started_recipients' => $startedCount,
+                'completed_recipients' => $completedCount,
                 'completion_rate' => $completionRate,
             ],
             'funnel' => [
-                'invited' => $totalRecipients,
+                'invited' => $sentRecipients,
                 'started' => $startedCount,
                 'completed' => $completedCount,
             ],
@@ -563,6 +641,116 @@ class SurveyController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'recipients' => $recipients,
+        ]);
+    }
+
+    public function responseDetail(Survey $survey, Contact $contact): Response
+    {
+        $survey = Survey::query()
+            ->whereKey($survey->id)
+            ->where('created_by', Auth::id())
+            ->with('questions.options')
+            ->firstOrFail();
+
+        $recipient = $survey->contacts()
+            ->whereKey($contact->id)
+            ->with('group:id,name')
+            ->firstOrFail();
+
+        $response = SurveyResponse::query()
+            ->where('survey_id', $survey->id)
+            ->where('contact_id', $recipient->id)
+            ->with(['answers.option', 'answers.question'])
+            ->first();
+
+        $answersByQuestion = $response?->answers
+            ->keyBy('question_id')
+            ?? collect();
+
+        $questions = $survey->questions
+            ->values()
+            ->map(function ($question, int $index) use ($answersByQuestion): array {
+                $answer = $answersByQuestion->get($question->id);
+                $answerText = null;
+
+                if ($answer !== null) {
+                    if ($answer->option_id !== null) {
+                        $answerText = $answer->option?->option;
+                    } else {
+                        $answerText = $answer->answer_text;
+                    }
+                }
+
+                return [
+                    'id' => $question->id,
+                    'label' => sprintf('Q%d', $index + 1),
+                    'question' => $question->question,
+                    'response_type' => $question->response_type,
+                    'answer' => $answerText,
+                ];
+            })
+            ->all();
+
+        $messages = SurveyMessage::query()
+            ->where('survey_id', $survey->id)
+            ->where('contact_id', $recipient->id)
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn (SurveyMessage $message): array => [
+                'id' => $message->id,
+                'direction' => $message->direction,
+                'phone' => $message->phone,
+                'delivery_status' => $message->delivery_status,
+                'provider_message_id' => $message->provider_message_id,
+                'resolved_option_text' => $message->resolved_option_text,
+                'message' => $message->message,
+                'payload' => $message->payload,
+                'created_at' => $message->created_at?->toDateTimeString(),
+            ])
+            ->all();
+
+        $sentAt = $recipient->pivot?->sent_at;
+        $startedAt = $response?->started_at ?? $recipient->pivot?->sms_flow_started_at;
+        $completedAt = $response?->completed_at ?? $recipient->pivot?->sms_flow_completed_at;
+        $responseStatus = 'pending_send';
+
+        if ($sentAt !== null) {
+            $responseStatus = 'awaiting_response';
+        }
+
+        if ($startedAt !== null) {
+            $responseStatus = 'in_progress';
+        }
+
+        if ($completedAt !== null) {
+            $responseStatus = 'completed';
+        }
+
+        return Inertia::render('surveys/question/ResponseDetail', [
+            'survey' => [
+                'id' => $survey->id,
+                'name' => $survey->name,
+            ],
+            'recipient' => [
+                'id' => $recipient->id,
+                'names' => $recipient->names,
+                'phone' => $recipient->phone,
+                'email' => $recipient->email,
+                'group_name' => $recipient->group?->name,
+                'status' => $responseStatus,
+                'timeline' => [
+                    'invited_at' => $survey->created_at,
+                    'sent_at' => $sentAt,
+                    'replied_at' => $startedAt,
+                    'completed_at' => $completedAt,
+                ],
+            ],
+            'response' => [
+                'started_at' => $startedAt,
+                'completed_at' => $completedAt,
+                'answers' => $questions,
+                'messages' => $messages,
+            ],
         ]);
     }
 
@@ -597,6 +785,21 @@ class SurveyController extends Controller
 
             foreach ($recipients as $recipient) {
                 $sentAt = $recipient->pivot?->sent_at;
+                $startedAt = $recipient->pivot?->sms_flow_started_at;
+                $completedAt = $recipient->pivot?->sms_flow_completed_at;
+                $responseStatus = 'pending_send';
+
+                if ($sentAt !== null) {
+                    $responseStatus = 'awaiting_response';
+                }
+
+                if ($startedAt !== null) {
+                    $responseStatus = 'in_progress';
+                }
+
+                if ($completedAt !== null) {
+                    $responseStatus = 'completed';
+                }
 
                 fputcsv($output, [
                     $recipient->names,
@@ -605,10 +808,102 @@ class SurveyController extends Controller
                     $recipient->group?->name,
                     $sentAt,
                     $sentAt,
-                    '',
-                    '',
-                    $sentAt ? 'awaiting_response' : 'pending_send',
+                    $startedAt,
+                    $completedAt,
+                    $responseStatus,
                 ]);
+            }
+
+            fclose($output);
+        }, $filename, $headers);
+    }
+
+    private function exportAnswers(Survey $survey, $recipients, string $format): StreamedResponse
+    {
+        $questions = $survey->questions->values();
+        $questionHeaders = $questions
+            ->map(fn ($question, int $index): string => sprintf('Q%d: %s', $index + 1, $question->question))
+            ->all();
+
+        $optionTextById = $questions
+            ->flatMap(fn ($question) => $question->options)
+            ->mapWithKeys(fn ($option): array => [$option->id => $option->option])
+            ->all();
+
+        $recipientIds = $recipients->pluck('id')->all();
+        $responses = $recipientIds === []
+            ? collect()
+            : SurveyResponse::query()
+                ->where('survey_id', $survey->id)
+                ->whereIn('contact_id', $recipientIds)
+                ->with('answers')
+                ->get()
+                ->keyBy('contact_id');
+
+        $filename = sprintf(
+            '%s-answers.%s',
+            str($survey->name)->slug()->value(),
+            $format
+        );
+
+        $headers = [
+            'Content-Type' => $format === 'xlsx'
+                ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                : 'text/csv; charset=UTF-8',
+        ];
+
+        return response()->streamDownload(function () use (
+            $recipients,
+            $responses,
+            $questions,
+            $questionHeaders,
+            $optionTextById
+        ): void {
+            $output = fopen('php://output', 'w');
+
+            fputcsv($output, [
+                'Name',
+                'Phone',
+                'Email',
+                'Group',
+                'Sent At',
+                'Started At',
+                'Completed At',
+                ...$questionHeaders,
+            ]);
+
+            foreach ($recipients as $recipient) {
+                $response = $responses->get($recipient->id);
+                $answersByQuestion = $response?->answers
+                    ? $response->answers->keyBy('question_id')
+                    : collect();
+
+                $row = [
+                    $recipient->names,
+                    $recipient->phone,
+                    $recipient->email,
+                    $recipient->group?->name,
+                    $recipient->pivot?->sent_at,
+                    $response?->started_at,
+                    $response?->completed_at,
+                ];
+
+                foreach ($questions as $question) {
+                    $answer = $answersByQuestion->get($question->id);
+                    $answerValue = '';
+
+                    if ($answer !== null) {
+                        if ($answer->option_id !== null) {
+                            $answerValue = (string) ($optionTextById[$answer->option_id] ?? '');
+                        } else {
+                            $answerValue = (string) ($answer->answer_text ?? '');
+                        }
+                    }
+
+                    $row[] = $answerValue;
+                }
+
+                fputcsv($output, $row);
             }
 
             fclose($output);

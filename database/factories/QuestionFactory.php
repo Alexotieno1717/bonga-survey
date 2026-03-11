@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Survey;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -17,7 +18,13 @@ class QuestionFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'survey_id' => Survey::factory(),
+            'question' => $this->faker->sentence(),
+            'response_type' => $this->faker->randomElement(['free-text', 'multiple-choice']),
+            'free_text_description' => null,
+            'allow_multiple' => false,
+            'order' => $this->faker->numberBetween(0, 5),
+            'branching' => null,
         ];
     }
 }

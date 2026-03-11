@@ -36,6 +36,7 @@ return [
     ],
 
     'sms' => [
+        'driver' => env('SMS_GATEWAY_DRIVER', 'http'),
         'url' => env('SMS_GATEWAY_URL', 'http://167.172.14.50:4002/v1/send-sms'),
         'client_id' => env('SMS_GATEWAY_CLIENT_ID'),
         'key' => env('SMS_GATEWAY_KEY'),
