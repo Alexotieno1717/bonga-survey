@@ -47,4 +47,13 @@ return [
         'retry_base_delay_ms' => (int) env('SMS_GATEWAY_RETRY_BASE_DELAY_MS', 300),
     ],
 
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'organization' => env('OPENAI_ORG_ID'),
+        'project' => env('OPENAI_PROJECT_ID'),
+        'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
+        'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
+        'timeout' => (int) env('OPENAI_TIMEOUT', 30),
+    ],
+
 ];

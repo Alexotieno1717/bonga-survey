@@ -39,8 +39,8 @@ export default function SurveyOutroStep({
 
             <SurveySectionCard className="p-5 md:p-6">
                 <div className="mb-3 flex items-center justify-between">
-                    <label className="text-sm font-medium text-slate-700">Completion Message</label>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Completion Message</label>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-700/60 dark:text-slate-100">
                         {values.completionMessage?.length || 0} chars
                     </span>
                 </div>
@@ -67,7 +67,7 @@ export default function SurveyOutroStep({
                 ) : null}
 
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-slate-500 dark:text-slate-300">
                         Leave empty if you do not want to send a completion SMS.
                     </p>
                     <Button

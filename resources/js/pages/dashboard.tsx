@@ -23,6 +23,11 @@ interface SurveyStats {
     completed: number;
 }
 
+interface SurveyCreationStats {
+    ai: number;
+    manual: number;
+}
+
 interface ChartPoint {
     label: string;
     key: SurveyStatus;
@@ -35,6 +40,7 @@ interface RecentSurvey {
     status: SurveyStatus;
     created_at: string | null;
     contacts_count: number;
+    created_with_ai: boolean;
 }
 
 interface SmsOutboxEntry {
@@ -70,8 +76,9 @@ function maxChartValue(chart: ChartPoint[]): number {
 }
 
 export default function Dashboard() {
-    const { surveyStats, statusChart, recentSurveys, smsDriver, smsOutbox } = usePage().props as unknown as {
+    const { surveyStats, surveyCreationStats, statusChart, recentSurveys, smsDriver, smsOutbox } = usePage().props as unknown as {
         surveyStats: SurveyStats;
+        surveyCreationStats: SurveyCreationStats;
         statusChart: ChartPoint[];
         recentSurveys: RecentSurvey[];
         smsDriver: string;
@@ -177,43 +184,93 @@ export default function Dashboard() {
                         </CardContent>
                     </Card>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-lg">Recent Surveys</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {recentSurveys.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    No surveys yet.
-                                </p>
-                            ) : (
-                                recentSurveys.map((survey) => (
-                                    <Link
-                                        key={survey.id}
-                                        href={surveys.show(survey.id).url}
-                                        className="block rounded-lg border p-3 transition hover:bg-slate-50"
-                                    >
-                                        <p className="line-clamp-1 text-sm font-semibold text-slate-900">
-                                            {survey.name}
-                                        </p>
-                                        <div className="mt-2 flex items-center justify-between">
-                                            <Badge variant={badgeVariants[survey.status]} className="capitalize">
-                                                {survey.status}
-                                            </Badge>
-                                            <span className="text-xs text-muted-foreground">
-                                                {survey.contacts_count} recipients
-                                            </span>
-                                        </div>
-                                        <p className="mt-2 text-xs text-muted-foreground">
-                                            {survey.created_at
-                                                ? format(new Date(survey.created_at), 'MMM d, yyyy')
-                                                : 'Date not available'}
-                                        </p>
-                                    </Link>
-                                ))
-                            )}
-                        </CardContent>
-                    </Card>
+                    <div className="space-y-4">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-lg">Recent Surveys</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                {recentSurveys.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        No surveys yet.
+                                    </p>
+                                ) : (
+                                    recentSurveys.map((survey) => (
+                                        <Link
+                                            key={survey.id}
+                                            href={surveys.show(survey.id).url}
+                                            className="block rounded-lg border p-3 transition hover:bg-slate-50 dark:border-slate-500/40 dark:bg-slate-800/25 dark:hover:bg-slate-700/35"
+                                        >
+                                            <p className="line-clamp-1 text-sm font-semibold text-slate-900 dark:text-white">
+                                                {survey.name}
+                                            </p>
+                                            <div className="mt-2 flex items-center justify-between gap-3">
+                                                <div className="flex items-center gap-2">
+                                                    <Badge variant={badgeVariants[survey.status]} className="capitalize">
+                                                        {survey.status}
+                                                    </Badge>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={
+                                                            survey.created_with_ai
+                                                                ? 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-300/40 dark:bg-indigo-400/20 dark:text-indigo-100'
+                                                                : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-400/40 dark:bg-slate-600/30 dark:text-slate-100'
+                                                        }
+                                                    >
+                                                        {survey.created_with_ai ? 'AI' : 'Manual'}
+                                                    </Badge>
+                                                </div>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {survey.contacts_count} recipients
+                                                </span>
+                                            </div>
+                                            <p className="mt-2 text-xs text-muted-foreground">
+                                                {survey.created_at
+                                                    ? format(new Date(survey.created_at), 'MMM d, yyyy')
+                                                    : 'Date not available'}
+                                            </p>
+                                        </Link>
+                                    ))
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-lg">Survey Creation</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <div className="flex items-center justify-between rounded-lg border border-indigo-100 bg-indigo-50/60 px-3 py-2 dark:border-indigo-300/35 dark:bg-indigo-400/15">
+                                    <div className="flex items-center gap-2">
+                                        <Badge
+                                            variant="outline"
+                                            className="border-indigo-200 bg-white text-indigo-700 dark:border-indigo-300/40 dark:bg-indigo-100/10 dark:text-indigo-100"
+                                        >
+                                            AI
+                                        </Badge>
+                                        <span className="text-sm text-slate-700 dark:text-indigo-100">Created with AI</span>
+                                    </div>
+                                    <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                                        {surveyCreationStats.ai}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-400/35 dark:bg-slate-600/30">
+                                    <div className="flex items-center gap-2">
+                                        <Badge
+                                            variant="outline"
+                                            className="border-slate-200 bg-white text-slate-600 dark:border-slate-300/40 dark:bg-slate-100/10 dark:text-slate-100"
+                                        >
+                                            Manual
+                                        </Badge>
+                                        <span className="text-sm text-slate-700 dark:text-slate-100">Created manually</span>
+                                    </div>
+                                    <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                                        {surveyCreationStats.manual}
+                                    </span>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </div>
 
                 {smsDriver === 'log' ? (

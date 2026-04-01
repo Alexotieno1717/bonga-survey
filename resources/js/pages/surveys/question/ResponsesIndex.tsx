@@ -13,6 +13,7 @@ interface SurveyListItem {
     name: string;
     status: string;
     created_at: string;
+    created_with_ai?: boolean;
     questions_count: number;
     contacts_count: number;
     sent_recipients_count: number;
@@ -54,11 +55,11 @@ export default function ResponsesIndex() {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Survey Responses" />
 
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto rounded-xl p-4">
-                <Card className="overflow-hidden border-0 bg-gradient-to-r from-slate-900 to-slate-700 text-white shadow-lg">
+            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto rounded-xl p-4 dark:text-[#BAD9FC]">
+                <Card className="overflow-hidden border-0 bg-gradient-to-r from-[#010618] via-[#16263a] to-[#2f4157] text-white shadow-lg">
                     <CardHeader className="space-y-2">
                         <CardTitle className="text-2xl font-semibold">Survey Responses</CardTitle>
-                        <p className="text-sm text-slate-200">
+                        <p className="text-sm text-[#BAD9FC]">
                             Select a survey to view response analytics, delivery, and recipient timelines.
                         </p>
                     </CardHeader>
@@ -71,19 +72,31 @@ export default function ResponsesIndex() {
                             href={surveysRoutes.responses(survey.id).url}
                             className="block"
                         >
-                            <Card className="h-full border-slate-200 transition hover:-translate-y-0.5 hover:shadow-md">
+                            <Card className="h-full border-slate-200 transition hover:-translate-y-0.5 hover:shadow-md dark:border-[#4f6885] dark:bg-[#2f4157]/70 dark:text-[#BAD9FC] dark:hover:bg-[#3a4f68]/80">
                                 <CardHeader className="space-y-2">
                                     <div className="flex items-center justify-between gap-2">
-                                        <CardTitle className="line-clamp-1 text-base">{survey.name}</CardTitle>
-                                        <Badge variant="outline" className="capitalize">
-                                            {survey.status}
-                                        </Badge>
+                                        <CardTitle className="line-clamp-1 text-base dark:text-white">{survey.name}</CardTitle>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="outline" className="capitalize dark:border-[#6d87a8] dark:bg-[#010618]/40 dark:text-[#BAD9FC]">
+                                                {survey.status}
+                                            </Badge>
+                                            <Badge
+                                                variant="outline"
+                                                className={
+                                                    survey.created_with_ai
+                                                        ? 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-sky-300/55 dark:bg-sky-500/15 dark:text-sky-100'
+                                                        : 'border-slate-200 bg-slate-50 text-slate-600 dark:border-[#6d87a8] dark:bg-[#010618]/35 dark:text-[#BAD9FC]'
+                                                }
+                                            >
+                                                {survey.created_with_ai ? 'AI' : 'Manual'}
+                                            </Badge>
+                                        </div>
                                     </div>
-                                    <p className="text-xs text-slate-500">
+                                    <p className="text-xs text-slate-500 dark:text-[#BAD9FC]">
                                         Created {format(new Date(survey.created_at), 'MMM d, yyyy')}
                                     </p>
                                 </CardHeader>
-                                <CardContent className="space-y-2 text-sm text-slate-600">
+                                <CardContent className="space-y-2 text-sm text-slate-600 dark:text-[#BAD9FC]">
                                     <div className="flex items-center gap-2">
                                         <BarChart3 className="h-4 w-4" />
                                         <span>{survey.questions_count} questions</span>
@@ -102,8 +115,8 @@ export default function ResponsesIndex() {
                     ))}
                 </div>
 
-                <div className="mt-2 flex flex-col gap-3 border-t border-slate-200 pt-4 md:flex-row md:items-center md:justify-between">
-                    <p className="text-sm text-slate-600">
+                <div className="mt-2 flex flex-col gap-3 border-t border-slate-200 pt-4 md:flex-row md:items-center md:justify-between dark:border-[#4f6885]">
+                    <p className="text-sm text-slate-600 dark:text-[#BAD9FC]">
                         Showing {surveys.from ?? 0} to {surveys.to ?? 0} of {surveys.total} surveys
                     </p>
 
@@ -113,18 +126,18 @@ export default function ResponsesIndex() {
                                 <Link
                                     key={index}
                                     href={link.url}
-                                    className={`rounded-md border px-3 py-1.5 text-sm transition ${
-                                        link.active
-                                            ? 'border-blue-600 bg-blue-600 text-white'
-                                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'
-                                    }`}
+                                        className={`rounded-md border px-3 py-1.5 text-sm transition ${
+                                            link.active
+                                            ? 'border-blue-600 bg-blue-600 text-white dark:border-sky-400 dark:bg-sky-400 dark:text-[#010618]'
+                                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100 dark:border-[#4f6885] dark:bg-[#2f4157]/70 dark:text-[#BAD9FC] dark:hover:bg-[#3a4f68]/80'
+                                        }`}
                                 >
                                     {cleanPaginationLabel(link.label)}
                                 </Link>
                             ) : (
                                 <span
                                     key={index}
-                                    className="cursor-not-allowed rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 text-sm text-slate-400"
+                                    className="cursor-not-allowed rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 text-sm text-slate-400 dark:border-[#405775] dark:bg-[#2f4157]/45 dark:text-[#9fbbd8]"
                                 >
                                     {cleanPaginationLabel(link.label)}
                                 </span>

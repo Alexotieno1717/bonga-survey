@@ -64,7 +64,7 @@ export default function Login({
                                                 tabIndex={1}
                                                 autoComplete="email"
                                                 placeholder="Enter your email"
-                                                className="h-11"
+                                                className="h-11 dark:bg-white dark:border-gray-300 dark:placeholder:text-gray-400"
                                             />
                                             <InputError message={errors.email} />
                                         </div>
@@ -86,7 +86,7 @@ export default function Login({
                                                 tabIndex={2}
                                                 autoComplete="current-password"
                                                 placeholder="Enter your password"
-                                                className="h-11"
+                                                className="h-11 dark:bg-white dark:border-gray-300 dark:placeholder:text-gray-400"
                                             />
                                             <InputError message={errors.password} />
                                         </div>

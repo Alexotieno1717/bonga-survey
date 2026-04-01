@@ -25,6 +25,7 @@ class Survey extends Model
         'scheduled_time',
         'status',
         'branching_logic',
+        'created_with_ai',
         'created_by',
     ];
 
@@ -33,6 +34,7 @@ class Survey extends Model
         'end_date' => 'date',
         'scheduled_time' => 'datetime',
         'branching_logic' => 'array',
+        'created_with_ai' => 'boolean',
     ];
 
     public function questions(): HasMany

@@ -17,27 +17,44 @@ export default function Register() {
             <div className="grid min-h-screen bg-slate-100 lg:grid-cols-2">
                 <section className="flex items-center justify-center px-6 py-10 md:px-10">
                     <div className="w-full max-w-md">
-                        <Link href={home()} className="mb-8 inline-flex items-center gap-3 text-slate-900">
+                        <Link
+                            href={home()}
+                            className="mb-8 inline-flex items-center gap-3 text-slate-900"
+                        >
                             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
                                 <AppLogoIcon className="size-6 fill-current" />
                             </span>
-                            <span className="text-lg font-semibold">Bonga Survey</span>
+                            <span className="text-lg font-semibold">
+                                Bonga Survey
+                            </span>
                         </Link>
 
                         <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm md:p-8">
-                            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Create account</h1>
-                            <p className="mt-2 text-sm text-slate-500">Set up your account to start running surveys.</p>
+                            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+                                Create account
+                            </h1>
+                            <p className="mt-2 text-sm text-slate-500">
+                                Set up your account to start running surveys.
+                            </p>
 
                             <Form
                                 {...store.form()}
-                                resetOnSuccess={['password', 'password_confirmation']}
+                                resetOnSuccess={[
+                                    'password',
+                                    'password_confirmation',
+                                ]}
                                 disableWhileProcessing
                                 className="mt-6 flex flex-col gap-5"
                             >
                                 {({ processing, errors }) => (
                                     <>
                                         <div className="grid gap-1.5">
-                                            <Label htmlFor="name" className="text-slate-700">Name</Label>
+                                            <Label
+                                                htmlFor="name"
+                                                className="text-slate-700"
+                                            >
+                                                Name
+                                            </Label>
                                             <Input
                                                 id="name"
                                                 type="text"
@@ -47,13 +64,18 @@ export default function Register() {
                                                 autoComplete="name"
                                                 name="name"
                                                 placeholder="Enter your full name"
-                                                className="h-11"
+                                                className="h-11 dark:border-gray-300 dark:bg-white dark:placeholder:text-gray-400"
                                             />
                                             <InputError message={errors.name} />
                                         </div>
 
                                         <div className="grid gap-1.5">
-                                            <Label htmlFor="email" className="text-slate-700">Email</Label>
+                                            <Label
+                                                htmlFor="email"
+                                                className="text-slate-700"
+                                            >
+                                                Email
+                                            </Label>
                                             <Input
                                                 id="email"
                                                 type="email"
@@ -62,13 +84,20 @@ export default function Register() {
                                                 autoComplete="email"
                                                 name="email"
                                                 placeholder="Enter your email"
-                                                className="h-11"
+                                                className="h-11 dark:border-gray-300 dark:bg-white dark:placeholder:text-gray-400"
                                             />
-                                            <InputError message={errors.email} />
+                                            <InputError
+                                                message={errors.email}
+                                            />
                                         </div>
 
                                         <div className="grid gap-1.5">
-                                            <Label htmlFor="password" className="text-slate-700">Password</Label>
+                                            <Label
+                                                htmlFor="password"
+                                                className="text-slate-700"
+                                            >
+                                                Password
+                                            </Label>
                                             <Input
                                                 id="password"
                                                 type="password"
@@ -77,13 +106,20 @@ export default function Register() {
                                                 autoComplete="new-password"
                                                 name="password"
                                                 placeholder="Create a password"
-                                                className="h-11"
+                                                className="h-11 dark:border-gray-300 dark:bg-white dark:placeholder:text-gray-400"
                                             />
-                                            <InputError message={errors.password} />
+                                            <InputError
+                                                message={errors.password}
+                                            />
                                         </div>
 
                                         <div className="grid gap-1.5">
-                                            <Label htmlFor="password_confirmation" className="text-slate-700">Confirm password</Label>
+                                            <Label
+                                                htmlFor="password_confirmation"
+                                                className="text-slate-700"
+                                            >
+                                                Confirm password
+                                            </Label>
                                             <Input
                                                 id="password_confirmation"
                                                 type="password"
@@ -92,9 +128,13 @@ export default function Register() {
                                                 autoComplete="new-password"
                                                 name="password_confirmation"
                                                 placeholder="Confirm your password"
-                                                className="h-11"
+                                                className="h-11 dark:border-gray-300 dark:bg-white dark:placeholder:text-gray-400"
                                             />
-                                            <InputError message={errors.password_confirmation} />
+                                            <InputError
+                                                message={
+                                                    errors.password_confirmation
+                                                }
+                                            />
                                         </div>
 
                                         <Button
@@ -109,7 +149,11 @@ export default function Register() {
 
                                         <p className="text-center text-sm text-slate-500">
                                             Already have an account?{' '}
-                                            <TextLink href={login()} tabIndex={6} className="font-medium no-underline">
+                                            <TextLink
+                                                href={login()}
+                                                tabIndex={6}
+                                                className="font-medium no-underline"
+                                            >
                                                 Log in
                                             </TextLink>
                                         </p>
@@ -124,12 +168,15 @@ export default function Register() {
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,_#2dd4bf_0%,_transparent_34%),linear-gradient(145deg,#0a2b3f_10%,#0f172a_70%)]" />
                     <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.08)_1px,transparent_1px)] bg-[size:34px_34px] opacity-25" />
                     <div className="relative z-10 m-auto max-w-md px-10 text-white">
-                        <p className="text-xs font-semibold tracking-[0.22em] text-teal-200 uppercase">Survey Platform</p>
-                        <h2 className="mt-4 text-5xl font-semibold leading-[1.05] tracking-tight">
+                        <p className="text-xs font-semibold tracking-[0.22em] text-teal-200 uppercase">
+                            Survey Platform
+                        </p>
+                        <h2 className="mt-4 text-5xl leading-[1.05] font-semibold tracking-tight">
                             Build better surveys with confidence.
                         </h2>
                         <p className="mt-6 text-lg leading-relaxed text-slate-200">
-                            Organize recipients, launch invitations, and track response performance from one focused workspace.
+                            Organize recipients, launch invitations, and track
+                            response performance from one focused workspace.
                         </p>
                     </div>
                 </section>

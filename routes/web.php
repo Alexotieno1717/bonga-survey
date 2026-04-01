@@ -4,6 +4,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Phonebook\ContactController;
 use App\Http\Controllers\Phonebook\ContactGroupController;
 use App\Http\Controllers\Phonebook\ContactGroupMapController;
+use App\Http\Controllers\SurveyAiController;
 use App\Http\Controllers\SurveyController;
 use App\Http\Controllers\SurveySmsWebhookController;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
@@ -27,6 +28,9 @@ Route::get('dashboard', DashboardController::class)->middleware(['auth', 'verifi
 Route::get('surveys/question', [SurveyController::class, 'index'])->name('questions.index')->middleware(['auth']);
 Route::get('surveys/question/create', [SurveyController::class, 'create'])->name('questions.create')->middleware(['auth']);
 Route::post('surveys/question', [SurveyController::class, 'store'])->name('questions.store')->middleware(['auth']);
+Route::get('surveys/ai', [SurveyAiController::class, 'index'])->name('surveys.ai.index')->middleware(['auth']);
+Route::post('surveys/ai', [SurveyAiController::class, 'generate'])->name('surveys.ai.generate')->middleware(['auth']);
+Route::post('surveys/ai/apply', [SurveyAiController::class, 'apply'])->name('surveys.ai.apply')->middleware(['auth']);
 // Route::get('surveys/question/{question}', [SurveyController::class, 'show'])->name('questions.show')->middleware(['auth']);
 Route::get('surveys/responses', [SurveyController::class, 'responsesIndex'])->middleware(['auth'])->name('surveys.responses.index');
 Route::get('surveys/{survey}', [SurveyController::class, 'show'])->middleware(['auth'])->name('surveys.show');

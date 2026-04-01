@@ -26,6 +26,7 @@ class StoreSurveyRequest extends FormRequest
             'status' => ['nullable', Rule::in(['draft', 'active'])],
             'surveyName' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string'],
+            'createdWithAi' => ['nullable', 'boolean'],
             'startDate' => ['required', 'date'],
             'endDate' => ['required', 'date', 'after:startDate'],
             'triggerWord' => ['required', 'string', 'max:50', 'unique:surveys,trigger_word'],

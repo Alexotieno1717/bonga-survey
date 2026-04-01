@@ -582,9 +582,9 @@ export default function QuestionsStep({
                             />
 
                             {question.responseType === 'multiple-choice' && question.isSaved ? (
-                                <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                                <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-500/35 dark:bg-slate-800/70">
                                     <div className="mb-3">
-                                        <label className="text-sm font-medium text-slate-700">Options</label>
+                                        <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Options</label>
                                     </div>
 
                                     <div className="mb-4 flex items-center space-x-2">
@@ -592,13 +592,13 @@ export default function QuestionsStep({
                                             type="checkbox"
                                             name={`questions[${index}].allowMultiple`}
                                             id={`allowMultiple-${index}`}
-                                            className="h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500"
+                                            className="h-4 w-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500 dark:border-slate-400/50 dark:bg-slate-900"
                                             checked={Boolean(question.allowMultiple)}
                                             onChange={(event) => {
                                                 setFieldValue(`questions[${index}].allowMultiple`, event.target.checked);
                                             }}
                                         />
-                                        <label htmlFor={`allowMultiple-${index}`} className="text-sm font-medium text-slate-700">
+                                        <label htmlFor={`allowMultiple-${index}`} className="text-sm font-medium text-slate-700 dark:text-slate-200">
                                             Allow participant to pick more than one option
                                         </label>
                                     </div>
@@ -687,7 +687,7 @@ export default function QuestionsStep({
                                                 setFieldValue(`questions[${index}].options`, newOptions);
                                                 setFieldValue(`questions[${index}].optionSaveStates`, newOptionSaveStates);
                                             }}
-                                            className="h-9 border-blue-300 bg-white text-blue-600 hover:bg-blue-50"
+                                            className="h-9 border-blue-300 bg-white text-blue-600 hover:bg-blue-50 dark:border-sky-400/50 dark:bg-slate-900/70 dark:text-sky-100 dark:hover:bg-sky-500/20"
                                         >
                                             Add Option
                                         </Button>
@@ -697,20 +697,20 @@ export default function QuestionsStep({
 
                             {question.responseType === 'free-text' ? (
                                 <div className="mt-5 space-y-1.5">
-                                    <label className="block text-sm font-medium text-slate-700">Explanation (Optional)</label>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Explanation (Optional)</label>
                                     <textarea
                                         value=""
                                         readOnly
                                         disabled
-                                        className="w-full rounded-lg border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500"
+                                        className="w-full rounded-lg border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500 dark:border-slate-500/35 dark:bg-slate-800/70 dark:text-slate-300"
                                         placeholder="Participants will give an open-ended answer..."
                                     />
                                 </div>
                             ) : null}
 
                             {(question.responseType !== 'multiple-choice' || question.allowMultiple) ? (
-                                <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                                <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-500/35 dark:bg-slate-800/70">
+                                    <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200">
                                         {question.responseType === 'multiple-choice' && question.allowMultiple
                                             ? 'After all Child Questions have been answered, go to:'
                                             : 'After answer has been submitted, go to:'}

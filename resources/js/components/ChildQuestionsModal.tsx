@@ -147,13 +147,13 @@ export default function ChildQuestionsModal({
         <Dialog open={isOpen} onClose={closeWithSave} className="relative z-50">
             <div className="fixed inset-0 bg-slate-900/50" />
             <div className="fixed inset-0 flex">
-                <DialogPanel className="h-full w-full max-w-2xl overflow-y-auto border-r border-slate-200 bg-white shadow-xl">
-                    <div className="sticky top-0 z-10 border-b border-slate-200 bg-white px-5 py-4">
+                <DialogPanel className="h-full w-full max-w-2xl overflow-y-auto border-r border-slate-200 dark:border-slate-500/35 bg-white dark:bg-slate-900/70 shadow-xl">
+                    <div className="sticky top-0 z-10 border-b border-slate-200 dark:border-slate-500/35 bg-white dark:bg-slate-900/70 px-5 py-4">
                         <div className="flex items-start justify-between gap-4">
-                            <DialogTitle className="text-base font-semibold text-slate-800">
+                            <DialogTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">
                                 Child Questions for
                                 {' '}
-                                <span className="text-violet-600">Option {optionNumber}: "{optionText || `Option ${optionNumber}`}"</span>
+                                <span className="text-violet-600 dark:text-violet-300">Option {optionNumber}: "{optionText || `Option ${optionNumber}`}"</span>
                                 {' '}
                                 of Question
                                 {' '}
@@ -161,7 +161,7 @@ export default function ChildQuestionsModal({
                             </DialogTitle>
                             <button
                                 type="button"
-                                className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                                className="rounded-md p-1 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/70 hover:text-slate-700 dark:hover:text-slate-100"
                                 onClick={closeWithSave}
                             >
                                 <X className="h-4 w-4" />
@@ -171,11 +171,11 @@ export default function ChildQuestionsModal({
 
                     <div className="space-y-5 px-5 py-5">
                         {localState.childQuestions.map((childQuestion, index) => (
-                            <div key={childQuestion.id} className="rounded-xl border border-slate-200 bg-white">
+                            <div key={childQuestion.id} className="rounded-xl border border-slate-200 dark:border-slate-500/35 bg-white dark:bg-slate-900/70">
                                 <div className="p-4">
                                     <div className="grid grid-cols-1 gap-3 md:grid-cols-[2fr_1fr]">
                                         <div className="space-y-1.5">
-                                            <label className="block text-sm font-medium text-slate-700">
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
                                                 Question {parentQuestionNumber}.{index + 1}
                                             </label>
                                             <input
@@ -188,11 +188,11 @@ export default function ChildQuestionsModal({
                                                     });
                                                 }}
                                                 placeholder="Add a survey question"
-                                                className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-violet-300 focus:ring-2 focus:ring-violet-100 focus:outline-none"
+                                                className="h-11 w-full rounded-lg border border-slate-200 dark:border-slate-500/35 bg-white dark:bg-slate-900/70 px-3 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:border-violet-300 dark:focus:border-violet-300/70 focus:ring-2 focus:ring-violet-100 dark:focus:ring-violet-900/40 focus:outline-none"
                                             />
                                         </div>
                                         <div className="space-y-1.5">
-                                            <label className="block text-sm font-medium text-slate-700">Response type</label>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">Response type</label>
                                             <select
                                                 value={childQuestion.responseType}
                                                 onChange={(event) => {
@@ -211,7 +211,7 @@ export default function ChildQuestionsModal({
                                                         isSaved: false,
                                                     });
                                                 }}
-                                                className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:border-violet-300 focus:ring-2 focus:ring-violet-100 focus:outline-none"
+                                                className="h-11 w-full rounded-lg border border-slate-200 dark:border-slate-500/35 bg-white dark:bg-slate-900/70 px-3 text-sm text-slate-700 dark:text-slate-200 focus:border-violet-300 dark:focus:border-violet-300/70 focus:ring-2 focus:ring-violet-100 dark:focus:ring-violet-900/40 focus:outline-none"
                                             >
                                                 <option value="free-text">Free text</option>
                                                 <option value="multiple-choice">Multiple Choice</option>
@@ -224,13 +224,13 @@ export default function ChildQuestionsModal({
                                             value=""
                                             disabled
                                             readOnly
-                                            className="mt-3 min-h-[88px] w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
+                                            className="mt-3 min-h-[88px] w-full rounded-lg border border-slate-200 dark:border-slate-500/35 bg-slate-50 dark:bg-slate-800/70 px-3 py-2 text-sm text-slate-500 dark:text-slate-300"
                                             placeholder="Participants will give an open-ended answer ..."
                                         />
                                     ) : (
-                                        <div className="mt-3 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                        <div className="mt-3 space-y-3 rounded-lg border border-slate-200 dark:border-slate-500/35 bg-slate-50 dark:bg-slate-800/70 p-3">
                                             <div className="space-y-1">
-                                                <label className="text-sm font-medium text-slate-700">Options</label>
+                                                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Options</label>
                                                 <div className="flex items-center gap-2">
                                                     <input
                                                         id={`allow-multiple-${childQuestion.id}`}
@@ -242,11 +242,11 @@ export default function ChildQuestionsModal({
                                                                 isSaved: false,
                                                             });
                                                         }}
-                                                        className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-400"
+                                                        className="h-4 w-4 rounded border-slate-300 dark:border-slate-500/35 text-violet-600 dark:text-violet-300 focus:ring-violet-400"
                                                     />
                                                     <label
                                                         htmlFor={`allow-multiple-${childQuestion.id}`}
-                                                        className="text-sm font-medium text-slate-700"
+                                                        className="text-sm font-medium text-slate-700 dark:text-slate-200"
                                                     >
                                                         Allow participant to pick more than one option
                                                     </label>
@@ -257,11 +257,11 @@ export default function ChildQuestionsModal({
                                                 {childQuestion.options.map((option, optionIndex) => (
                                                     <div
                                                         key={`${childQuestion.id}-option-${optionIndex}`}
-                                                        className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 bg-white p-3 md:grid-cols-[minmax(0,1fr)_220px]"
+                                                        className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 dark:border-slate-500/35 bg-white dark:bg-slate-900/70 p-3 md:grid-cols-[minmax(0,1fr)_220px]"
                                                     >
                                                         <div className="space-y-1">
                                                             <div className="flex items-center justify-between">
-                                                                <label className="block text-xs font-medium text-slate-600">
+                                                                <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">
                                                                     Option {optionIndex + 1}
                                                                 </label>
                                                                 <button
@@ -297,13 +297,13 @@ export default function ChildQuestionsModal({
                                                                     });
                                                                 }}
                                                                 placeholder={`Option ${optionIndex + 1}`}
-                                                                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:border-violet-300 focus:ring-2 focus:ring-violet-100 focus:outline-none"
+                                                                className="h-10 w-full rounded-lg border border-slate-200 dark:border-slate-500/35 bg-white dark:bg-slate-900/70 px-3 text-sm text-slate-700 dark:text-slate-200 focus:border-violet-300 dark:focus:border-violet-300/70 focus:ring-2 focus:ring-violet-100 dark:focus:ring-violet-900/40 focus:outline-none"
                                                             />
                                                         </div>
 
                                                         {childQuestion.optionSaveStates[optionIndex] && !childQuestion.allowMultiple ? (
                                                             <div className="space-y-1">
-                                                                <label className="block text-xs font-medium text-slate-600">
+                                                                <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">
                                                                     If option {optionIndex + 1} is picked, go to:
                                                                 </label>
                                                                 {(() => {
@@ -325,7 +325,7 @@ export default function ChildQuestionsModal({
                                                                             isSaved: false,
                                                                         });
                                                                     }}
-                                                                    className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:border-violet-300 focus:ring-2 focus:ring-violet-100 focus:outline-none"
+                                                                    className="h-10 w-full rounded-lg border border-slate-200 dark:border-slate-500/35 bg-white dark:bg-slate-900/70 px-3 text-sm text-slate-700 dark:text-slate-200 focus:border-violet-300 dark:focus:border-violet-300/70 focus:ring-2 focus:ring-violet-100 dark:focus:ring-violet-900/40 focus:outline-none"
                                                                 >
                                                                     <option value="0">Next Question, if added</option>
                                                                     {childQuestionTargets.map((target) => (
@@ -371,7 +371,7 @@ export default function ChildQuestionsModal({
                                                 <Button
                                                     type="button"
                                                     variant="outline"
-                                                    className="h-8 border-violet-400 text-violet-700 hover:bg-violet-50"
+                                                    className="h-8 border-violet-400 dark:border-violet-300/60 text-violet-700 dark:text-violet-200 hover:bg-violet-50"
                                                     onClick={() => {
                                                         const nextOptions = [...childQuestion.options, ''];
                                                         const nextOptionBranching = [...childQuestion.optionBranching, '0'];
@@ -391,10 +391,10 @@ export default function ChildQuestionsModal({
                                     )}
                                 </div>
 
-                                <div className="border-t border-slate-200 px-4 py-3">
+                                <div className="border-t border-slate-200 dark:border-slate-500/35 px-4 py-3">
                                     {(childQuestion.responseType !== 'multiple-choice' || childQuestion.allowMultiple) ? (
                                         <>
-                                            <label className="mb-1.5 block text-sm font-medium text-slate-600">
+                                            <label className="mb-1.5 block text-sm font-medium text-slate-600 dark:text-slate-300">
                                                 After answer has been submitted, go to:
                                             </label>
                                             {(() => {
@@ -415,7 +415,7 @@ export default function ChildQuestionsModal({
                                                                 isSaved: false,
                                                             });
                                                         }}
-                                                        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:border-violet-300 focus:ring-2 focus:ring-violet-100 focus:outline-none"
+                                                        className="h-10 w-full rounded-lg border border-slate-200 dark:border-slate-500/35 bg-white dark:bg-slate-900/70 px-3 text-sm text-slate-700 dark:text-slate-200 focus:border-violet-300 dark:focus:border-violet-300/70 focus:ring-2 focus:ring-violet-100 dark:focus:ring-violet-900/40 focus:outline-none"
                                                     >
                                                         <option value="0">Next Question, if added</option>
                                                         {nextChildTargets.map((target) => (
@@ -432,10 +432,10 @@ export default function ChildQuestionsModal({
                                     ) : null}
                                 </div>
 
-                                <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3">
+                                <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-500/35 px-4 py-3">
                                     <div>
                                         {childQuestion.isSaved ? (
-                                            <p className="text-sm text-slate-500">
+                                            <p className="text-sm text-slate-500 dark:text-slate-300">
                                                 ~{childQuestion.question.length} characters. 1 message(s). GSM 7 Encoding.
                                             </p>
                                         ) : (
@@ -450,7 +450,7 @@ export default function ChildQuestionsModal({
                                             <button
                                                 type="button"
                                                 onClick={() => removeChildQuestion(index)}
-                                                className="rounded-md border border-slate-300 p-2 text-slate-500 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600"
+                                                className="rounded-md border border-slate-300 dark:border-slate-500/35 p-2 text-slate-500 dark:text-slate-300 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600"
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </button>
@@ -474,16 +474,16 @@ export default function ChildQuestionsModal({
                                     type="button"
                                     variant="outline"
                                     onClick={addChildQuestion}
-                                    className="border-violet-400 text-violet-700 hover:bg-violet-50"
+                                    className="border-violet-400 dark:border-violet-300/60 text-violet-700 dark:text-violet-200 hover:bg-violet-50"
                                 >
                                     Add Child Question
                                 </Button>
                             </div>
                         ) : null}
 
-                        <div className="border-t border-slate-200 pt-5">
-                            <h3 className="text-base font-semibold text-slate-700">Follow up question</h3>
-                            <label className="mt-2 mb-1.5 block text-sm font-medium text-slate-600">
+                        <div className="border-t border-slate-200 dark:border-slate-500/35 pt-5">
+                            <h3 className="text-base font-semibold text-slate-700 dark:text-slate-200">Follow up question</h3>
+                            <label className="mt-2 mb-1.5 block text-sm font-medium text-slate-600 dark:text-slate-300">
                                 After all the child questions above have been answered, go to:
                             </label>
                             <select
@@ -496,7 +496,7 @@ export default function ChildQuestionsModal({
                                         };
                                     });
                                 }}
-                                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:border-violet-300 focus:ring-2 focus:ring-violet-100 focus:outline-none"
+                                className="h-10 w-full rounded-lg border border-slate-200 dark:border-slate-500/35 bg-white dark:bg-slate-900/70 px-3 text-sm text-slate-700 dark:text-slate-200 focus:border-violet-300 dark:focus:border-violet-300/70 focus:ring-2 focus:ring-violet-100 dark:focus:ring-violet-900/40 focus:outline-none"
                             >
                                 <option value="0">Next Question, if added</option>
                                 {availableTargets.map((target) => (
@@ -510,7 +510,7 @@ export default function ChildQuestionsModal({
                         </div>
                     </div>
 
-                    <div className="sticky bottom-0 border-t border-slate-200 bg-white px-5 py-3">
+                    <div className="sticky bottom-0 border-t border-slate-200 dark:border-slate-500/35 bg-white dark:bg-slate-900/70 px-5 py-3">
                         <div className="flex justify-end gap-3">
                             <Button type="button" variant="outline" onClick={closeWithSave}>
                                 Done

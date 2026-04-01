@@ -18,8 +18,8 @@ export default function SurveyStepIntroCard({
     return (
         <SurveySectionCard className={cn('px-5 py-4 md:px-6', className)}>
             <div className={cn('space-y-1', contentClassName)}>
-                <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
-                {description ? <p className="text-sm text-slate-500">{description}</p> : null}
+                <h1 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h1>
+                {description ? <p className="text-sm text-slate-500 dark:text-slate-200">{description}</p> : null}
             </div>
         </SurveySectionCard>
     );

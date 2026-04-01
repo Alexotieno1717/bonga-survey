@@ -34,6 +34,7 @@ test('dashboard shows survey metrics and chart data', function (): void {
         'invitation_message' => 'Reply START',
         'scheduled_time' => now()->addDay(),
         'status' => 'draft',
+        'created_with_ai' => false,
         'created_by' => $user->id,
     ]);
 
@@ -47,6 +48,7 @@ test('dashboard shows survey metrics and chart data', function (): void {
         'invitation_message' => 'Reply START',
         'scheduled_time' => now()->addDay(),
         'status' => 'active',
+        'created_with_ai' => true,
         'created_by' => $user->id,
     ]);
 
@@ -60,8 +62,13 @@ test('dashboard shows survey metrics and chart data', function (): void {
         'invitation_message' => 'Reply START',
         'scheduled_time' => now()->subDays(2),
         'status' => 'completed',
+        'created_with_ai' => false,
         'created_by' => $user->id,
     ]);
+
+    $draftSurvey->forceFill(['created_at' => now()->subHours(3)])->save();
+    $completedSurvey->forceFill(['created_at' => now()->subHours(2)])->save();
+    $activeSurvey->forceFill(['created_at' => now()->subHour()])->save();
 
     $draftSurvey->contacts()->attach($contact->id, [
         'sent_at' => now(),
@@ -79,8 +86,11 @@ test('dashboard shows survey metrics and chart data', function (): void {
             ->where('surveyStats.draft', 1)
             ->where('surveyStats.active', 1)
             ->where('surveyStats.completed', 1)
+            ->where('surveyCreationStats.ai', 1)
+            ->where('surveyCreationStats.manual', 2)
             ->has('statusChart', 3)
             ->has('recentSurveys', 3)
+            ->where('recentSurveys.0.created_with_ai', true)
         );
 
     expect($activeSurvey->exists)->toBeTrue();

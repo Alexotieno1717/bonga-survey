@@ -62,7 +62,7 @@ const rightNavItems: NavItem[] = [
 ];
 
 const activeItemStyles =
-    'text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100';
+    'text-neutral-900 dark:bg-sidebar-accent dark:text-white';
 
 export function AppHeader({ breadcrumbs = [] }: Props) {
     const page = usePage<SharedData>();
@@ -71,7 +71,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
     const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
     return (
         <>
-            <div className="border-b border-sidebar-border/80">
+            <div className="bg-sidebar text-sidebar-foreground border-b border-sidebar-border/80">
                 <div className="mx-auto flex h-16 items-center px-4 md:max-w-7xl">
                     {/* Mobile Menu */}
                     <div className="lg:hidden">
@@ -240,8 +240,8 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                 </div>
             </div>
             {breadcrumbs.length > 1 && (
-                <div className="flex w-full border-b border-sidebar-border/70">
-                    <div className="mx-auto flex h-12 w-full items-center justify-start px-4 text-neutral-500 md:max-w-7xl">
+                <div className="bg-sidebar text-sidebar-foreground flex w-full border-b border-sidebar-border/70">
+                    <div className="mx-auto flex h-12 w-full items-center justify-start px-4 md:max-w-7xl">
                         <Breadcrumbs breadcrumbs={breadcrumbs} />
                     </div>
                 </div>

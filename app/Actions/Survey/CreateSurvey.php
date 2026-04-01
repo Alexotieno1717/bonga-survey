@@ -48,6 +48,7 @@ class CreateSurvey
                 'invitation_message' => $validated['invitationMessage'],
                 'scheduled_time' => $scheduleTime?->toDateTimeString(),
                 'status' => $status,
+                'created_with_ai' => (bool) ($validated['createdWithAi'] ?? false),
                 'created_by' => $userId,
             ]);
 

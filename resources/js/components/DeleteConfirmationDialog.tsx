@@ -19,9 +19,9 @@ const DeleteConfirmationDialog = ({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="rounded-lg bg-white p-6 shadow-lg">
-                <h2 className="mb-4 text-lg font-bold">{title}</h2>
-                <p className="mb-6 text-sm text-gray-600">{description}</p>
+            <div className="rounded-lg bg-white p-6 shadow-lg dark:border dark:border-slate-500/35 dark:bg-slate-900/95">
+                <h2 className="mb-4 text-lg font-bold dark:text-white">{title}</h2>
+                <p className="mb-6 text-sm text-gray-600 dark:text-slate-200">{description}</p>
                 <div className="flex justify-end space-x-4">
                     <Button type="button" variant="outline" onClick={onCancel}>
                         Cancel

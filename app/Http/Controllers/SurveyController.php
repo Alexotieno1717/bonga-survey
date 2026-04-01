@@ -75,6 +75,7 @@ class SurveyController extends Controller
             'contacts' => $contacts,
             'contactGroups' => $contactGroups,
             'existingTriggerWords' => $existingTriggerWords,
+            'aiDraft' => session()->pull('ai_survey_builder_draft'),
         ]);
     }
 
@@ -602,6 +603,7 @@ class SurveyController extends Controller
                 'id' => $survey->id,
                 'name' => $survey->name,
                 'status' => $survey->status,
+                'created_with_ai' => (bool) $survey->created_with_ai,
                 'trigger_word' => $survey->trigger_word,
                 'start_date' => $survey->start_date,
                 'end_date' => $survey->end_date,
@@ -704,7 +706,6 @@ class SurveyController extends Controller
                 'provider_message_id' => $message->provider_message_id,
                 'resolved_option_text' => $message->resolved_option_text,
                 'message' => $message->message,
-                'payload' => $message->payload,
                 'created_at' => $message->created_at?->toDateTimeString(),
             ])
             ->all();
@@ -730,6 +731,7 @@ class SurveyController extends Controller
             'survey' => [
                 'id' => $survey->id,
                 'name' => $survey->name,
+                'created_with_ai' => (bool) $survey->created_with_ai,
             ],
             'recipient' => [
                 'id' => $recipient->id,

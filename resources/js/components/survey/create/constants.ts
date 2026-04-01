@@ -14,6 +14,7 @@ export const surveyCreateInitialValues: FormValues = {
     submissionAction: 'active',
     surveyName: '',
     description: '',
+    createdWithAi: false,
     startDate: new Date(surveyCreateToday),
     endDate: null,
     shortCode: '20642',

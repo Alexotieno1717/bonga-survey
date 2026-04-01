@@ -98,38 +98,38 @@
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.145 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.145 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.985 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
+    --background: #081020;
+    --foreground: #bad9fc;
+    --card: #182038;
+    --card-foreground: #fff;
+    --popover: #182038;
+    --popover-foreground: #bad9fc;
+    --primary: #6fb7ff;
+    --primary-foreground: #081020;
+    --secondary: #202840;
+    --secondary-foreground: #dbeafe;
+    --muted: #202840;
+    --muted-foreground: #9ab7d8;
+    --accent: #24314a;
+    --accent-foreground: #fff;
     --destructive: oklch(0.396 0.141 25.723);
     --destructive-foreground: oklch(0.637 0.237 25.331);
-    --border: oklch(0.269 0 0);
-    --input: oklch(0.269 0 0);
-    --ring: oklch(0.439 0 0);
+    --border: #2b3a56;
+    --input: #24314a;
+    --ring: #6fb7ff;
     --chart-1: oklch(0.488 0.243 264.376);
     --chart-2: oklch(0.696 0.17 162.48);
     --chart-3: oklch(0.769 0.188 70.08);
     --chart-4: oklch(0.627 0.265 303.9);
     --chart-5: oklch(0.645 0.246 16.439);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.985 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(0.269 0 0);
-    --sidebar-ring: oklch(0.439 0 0);
+    --sidebar: #000018;
+    --sidebar-foreground: #bad9fc;
+    --sidebar-primary: #182038;
+    --sidebar-primary-foreground: #fff;
+    --sidebar-accent: #101830;
+    --sidebar-accent-foreground: #fff;
+    --sidebar-border: #1f2a45;
+    --sidebar-ring: #6fb7ff;
 }
 
 @layer base {
@@ -139,5 +139,24 @@
 
     body {
         @apply bg-background text-foreground;
+    }
+
+    .dark body {
+        background-image: radial-gradient(
+            circle at 30% 0%,
+            #182038 0%,
+            #081020 45%,
+            #000018 100%
+        );
+    }
+
+    .dark h1,
+    .dark h2,
+    .dark h3,
+    .dark h4,
+    .dark h5,
+    .dark h6 {
+        color: #fff;
+        font-weight: 700;
     }
 }

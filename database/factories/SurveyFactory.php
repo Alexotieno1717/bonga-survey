@@ -27,6 +27,7 @@ class SurveyFactory extends Factory
             'invitation_message' => 'Reply START',
             'scheduled_time' => now()->addHour(),
             'status' => 'draft',
+            'created_with_ai' => false,
             'created_by' => User::factory(),
         ];
     }

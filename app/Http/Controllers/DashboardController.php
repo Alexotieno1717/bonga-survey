@@ -35,6 +35,19 @@ class DashboardController extends Controller
             ->where('status', 'completed')
             ->count();
 
+        $aiSurveys = Survey::query()
+            ->where('created_by', $userId)
+            ->where('created_with_ai', true)
+            ->count();
+
+        $manualSurveys = Survey::query()
+            ->where('created_by', $userId)
+            ->where(function ($query): void {
+                $query->whereNull('created_with_ai')
+                    ->orWhere('created_with_ai', false);
+            })
+            ->count();
+
         $statusChart = [
             ['label' => 'Draft', 'key' => 'draft', 'value' => $draftSurveys],
             ['label' => 'Active', 'key' => 'active', 'value' => $activeSurveys],
@@ -53,6 +66,7 @@ class DashboardController extends Controller
                 'status' => $survey->status,
                 'created_at' => $survey->created_at?->toDateTimeString(),
                 'contacts_count' => $survey->contacts_count,
+                'created_with_ai' => (bool) $survey->created_with_ai,
             ]);
 
         $smsDriver = (string) Config::get('services.sms.driver', 'http');
@@ -66,6 +80,10 @@ class DashboardController extends Controller
                 'draft' => $draftSurveys,
                 'active' => $activeSurveys,
                 'completed' => $completedSurveys,
+            ],
+            'surveyCreationStats' => [
+                'ai' => $aiSurveys,
+                'manual' => $manualSurveys,
             ],
             'statusChart' => $statusChart,
             'recentSurveys' => $recentSurveys,

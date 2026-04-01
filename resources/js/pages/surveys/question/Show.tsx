@@ -76,6 +76,7 @@ interface SurveyDetails {
     scheduled_time: string | null;
     status: SurveyStatus;
     created_at: string;
+    created_with_ai?: boolean;
     sent_recipients_count: number;
     questions: SurveyQuestion[];
 }
@@ -484,12 +485,24 @@ export default function Show() {
                                 Survey #{survey.id}
                             </div>
 
-                            <Badge
-                                variant={statusVariant(survey.status)}
-                                className={`capitalize ${statusPillClass(survey.status)}`}
-                            >
-                                {survey.status}
-                            </Badge>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Badge
+                                    variant={statusVariant(survey.status)}
+                                    className={`capitalize ${statusPillClass(survey.status)}`}
+                                >
+                                    {survey.status}
+                                </Badge>
+                                <Badge
+                                    variant="outline"
+                                    className={
+                                        survey.created_with_ai
+                                            ? 'border-cyan-200/60 bg-cyan-200/15 text-cyan-100'
+                                            : 'border-white/30 bg-white/10 text-slate-100'
+                                    }
+                                >
+                                    {survey.created_with_ai ? 'AI' : 'Manual'}
+                                </Badge>
+                            </div>
                         </div>
 
                         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">

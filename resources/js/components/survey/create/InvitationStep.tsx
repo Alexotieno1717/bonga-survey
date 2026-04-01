@@ -42,8 +42,8 @@ export default function InvitationStep({
 
             <SurveySectionCard className="p-5 md:p-6">
                 <div className="mb-3 flex items-center justify-between">
-                    <label className="text-sm font-medium text-slate-700">Invitation Message</label>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-200">Invitation Message</label>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-700/60 dark:text-slate-100">
                         {values.invitationMessage.length || 0} chars
                     </span>
                 </div>
@@ -65,8 +65,8 @@ export default function InvitationStep({
                     <p className="pt-2 text-xs text-red-500">{invitationMessageError}</p>
                 ) : null}
 
-                <div className="mt-4 space-y-2 text-xs text-slate-500">
-                    <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="mt-4 space-y-2 text-xs text-slate-500 dark:text-slate-200">
+                    <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-500/35 dark:bg-slate-800/70">
                         This message contains the following additional characters for Safaricom recipients:
                         {' '}
                         STOP*456*9*5#
@@ -79,13 +79,13 @@ export default function InvitationStep({
 
             <SurveySectionCard className="p-5 md:p-6">
                 <SurveyField label="Schedule Time" error={scheduleTimeError}>
-                    <div className="mt-1 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+                    <div className="mt-1 inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-500/35 dark:bg-slate-800/70">
                         <button
                             type="button"
                             className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
                                 values.scheduleMode === 'now'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'text-slate-600 hover:bg-slate-100'
+                                    ? 'bg-blue-600 text-white dark:bg-sky-500 dark:text-slate-950'
+                                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/70'
                             }`}
                             onClick={() => {
                                 setFieldValue('scheduleMode', 'now');
@@ -98,8 +98,8 @@ export default function InvitationStep({
                             type="button"
                             className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
                                 values.scheduleMode === 'later'
-                                    ? 'bg-blue-600 text-white'
-                                    : 'text-slate-600 hover:bg-slate-100'
+                                    ? 'bg-blue-600 text-white dark:bg-sky-500 dark:text-slate-950'
+                                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/70'
                             }`}
                             onClick={() => {
                                 setFieldValue('scheduleMode', 'later');
@@ -115,7 +115,7 @@ export default function InvitationStep({
                         type="datetime-local"
                         name="scheduleTime"
                         disabled={values.scheduleMode === 'now'}
-                        className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+                        className="mt-2 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none dark:border-slate-500/40 dark:bg-slate-900/70 dark:text-slate-100 dark:focus:border-sky-400/70 dark:focus:ring-sky-900/40"
                         value={
                             values.scheduleMode === 'now'
                                 ? getCurrentDateTimeLocalValue()
@@ -129,7 +129,7 @@ export default function InvitationStep({
                         }}
                     />
                     {values.scheduleMode === 'now' ? (
-                        <p className="mt-2 text-xs text-slate-500">
+                        <p className="mt-2 text-xs text-slate-500 dark:text-slate-300">
                             Survey will be sent immediately after publish.
                         </p>
                     ) : null}

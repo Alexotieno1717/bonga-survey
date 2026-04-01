@@ -102,7 +102,7 @@ export default function SurveyDetailsStep({
                                         type="button"
                                         variant="outline"
                                         className={cn(
-                                            'h-11 w-full rounded-lg border-slate-200 pl-3 text-left font-normal hover:bg-slate-50',
+                                            'h-11 w-full rounded-lg border-slate-200 pl-3 text-left font-normal hover:bg-slate-50 dark:border-slate-500/40 dark:bg-slate-900/70 dark:text-slate-100 dark:hover:bg-slate-800/70',
                                             !values.startDate && 'text-muted-foreground',
                                         )}
                                     >
@@ -147,7 +147,7 @@ export default function SurveyDetailsStep({
                                         type="button"
                                         variant="outline"
                                         className={cn(
-                                            'h-11 w-full rounded-lg border-slate-200 pl-3 text-left font-normal hover:bg-slate-50',
+                                            'h-11 w-full rounded-lg border-slate-200 pl-3 text-left font-normal hover:bg-slate-50 dark:border-slate-500/40 dark:bg-slate-900/70 dark:text-slate-100 dark:hover:bg-slate-800/70',
                                             !values.endDate && 'text-muted-foreground',
                                         )}
                                     >
@@ -231,7 +231,7 @@ export default function SurveyDetailsStep({
                         </SurveyField>
                     </div>
 
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500 dark:border-slate-500/35 dark:bg-slate-800/70 dark:text-slate-200">
                         <p>User will text your keyword to the shortcode to start the survey.</p>
                         <p className="mt-2">Once the survey is published, details cannot be updated.</p>
                     </div>

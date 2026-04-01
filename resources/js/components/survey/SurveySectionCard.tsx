@@ -11,7 +11,12 @@ export default function SurveySectionCard({
     className,
 }: SurveySectionCardProps) {
     return (
-        <div className={cn('rounded-2xl border border-slate-200 bg-white shadow-sm', className)}>
+        <div
+            className={cn(
+                'rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-500/35 dark:bg-slate-900/55 dark:shadow-slate-900/40',
+                className,
+            )}
+        >
             {children}
         </div>
     );

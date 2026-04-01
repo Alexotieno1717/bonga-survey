@@ -36,21 +36,21 @@ export default function ReviewAndSendStep({
             accessorKey: 'message',
             header: 'Message',
             cell: ({ row }) => (
-                <span className="font-medium text-blue-600">{row.original.message}</span>
+                <span className="font-medium text-blue-600 dark:text-sky-100">{row.original.message}</span>
             ),
         },
         {
             accessorKey: 'number',
             header: 'Number',
             cell: ({ row }) => (
-                <span className="text-blue-600">{row.original.number}</span>
+                <span className="text-blue-600 dark:text-sky-100">{row.original.number}</span>
             ),
         },
         {
             accessorKey: 'msgCount',
             header: 'Msg Count',
             cell: ({ row }) => (
-                <span className="text-blue-600">{row.original.msgCount}</span>
+                <span className="text-blue-600 dark:text-sky-100">{row.original.msgCount}</span>
             ),
         },
         {
@@ -62,10 +62,10 @@ export default function ReviewAndSendStep({
             header: 'Actions',
             cell: () => (
                 <div className="flex items-center space-x-2">
-                    <button type="button" className="rounded-md border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50">
+                    <button type="button" className="rounded-md border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50 dark:border-slate-500/35 dark:text-slate-200 dark:hover:bg-slate-800/70">
                         <EditIcon className="h-4 w-4" />
                     </button>
-                    <button type="button" className="rounded-md border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50">
+                    <button type="button" className="rounded-md border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-50 dark:border-slate-500/35 dark:text-slate-200 dark:hover:bg-slate-800/70">
                         <Trash2 className="h-4 w-4" />
                     </button>
                 </div>
@@ -101,8 +101,8 @@ export default function ReviewAndSendStep({
             />
 
             <SurveySectionCard className="p-5 md:p-6">
-                <p className="text-xs font-medium tracking-wide text-slate-500 uppercase">Message Preview</p>
-                <p className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <p className="text-xs font-medium tracking-wide text-slate-500 uppercase dark:text-slate-300">Message Preview</p>
+                <p className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-500/35 dark:bg-slate-800/70 dark:text-slate-100">
                     {values.invitationMessage || 'Reply with START to participate'}
                 </p>
             </SurveySectionCard>

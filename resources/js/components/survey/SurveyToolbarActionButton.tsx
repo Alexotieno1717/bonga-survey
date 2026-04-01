@@ -13,9 +13,9 @@ interface SurveyToolbarActionButtonProps {
 }
 
 const variantClasses: Record<SurveyToolbarActionVariant, string> = {
-    neutral: 'border border-[#E3E5EB] bg-transparent text-gray-400 hover:bg-transparent hover:text-gray-400 hover:shadow-md',
-    primary: 'border border-blue-500 bg-transparent text-blue-500 hover:bg-transparent hover:text-blue-500 hover:shadow-md',
-    danger: 'border border-red-400 bg-transparent text-red-400 hover:bg-transparent hover:text-red-400 hover:shadow-md',
+    neutral: 'border border-[#E3E5EB] bg-transparent text-gray-500 hover:bg-transparent hover:text-gray-500 hover:shadow-md dark:border-slate-500/40 dark:text-slate-200 dark:hover:text-white',
+    primary: 'border border-blue-500 bg-transparent text-blue-500 hover:bg-transparent hover:text-blue-500 hover:shadow-md dark:border-sky-400/60 dark:text-sky-100 dark:hover:text-sky-100',
+    danger: 'border border-red-400 bg-transparent text-red-500 hover:bg-transparent hover:text-red-500 hover:shadow-md dark:border-red-400/60 dark:text-red-200 dark:hover:text-red-100',
 };
 
 export default function SurveyToolbarActionButton({

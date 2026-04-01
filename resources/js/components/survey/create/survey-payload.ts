@@ -22,6 +22,7 @@ export const buildSurveyPayload = ({
         status: submissionAction,
         surveyName: values.surveyName,
         description: values.description,
+        createdWithAi: values.createdWithAi,
         startDate: formattedStartDate,
         endDate: formattedEndDate,
         triggerWord: values.triggerWord,

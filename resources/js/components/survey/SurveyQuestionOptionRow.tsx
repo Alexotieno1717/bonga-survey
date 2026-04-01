@@ -37,9 +37,9 @@ export default function SurveyQuestionOptionRow({
     onOpenChildQuestions,
 }: SurveyQuestionOptionRowProps) {
     return (
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
+        <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-500/35 dark:bg-slate-900/60">
             <div className="mb-2 flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-700">Label {optionIndex + 1}</span>
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-200">Label {optionIndex + 1}</span>
                 <button
                     type="button"
                     onClick={onRemove}
@@ -60,7 +60,7 @@ export default function SurveyQuestionOptionRow({
                 <input
                     value={optionValue}
                     type="text"
-                    className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none"
+                    className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 placeholder:text-slate-400 focus:border-blue-200 focus:ring-2 focus:ring-blue-100 focus:outline-none dark:border-slate-500/40 dark:bg-slate-900/70 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus:border-sky-400/70 dark:focus:ring-sky-900/40"
                     placeholder={`Option ${optionIndex + 1}`}
                     onChange={(event) => {
                         onOptionChange(event.target.value);
@@ -72,7 +72,7 @@ export default function SurveyQuestionOptionRow({
                         <Button
                             type="button"
                             variant="outline"
-                            className="h-10 w-full border-blue-400 text-blue-700 hover:bg-blue-50"
+                            className="h-10 w-full border-blue-400 text-blue-700 hover:bg-blue-50 dark:border-sky-400/50 dark:text-sky-100 dark:hover:bg-sky-500/20"
                             onClick={onOpenChildQuestions}
                         >
                             {childQuestionsButtonLabel}
@@ -83,7 +83,7 @@ export default function SurveyQuestionOptionRow({
                         {optionValue.trim().length > 0 ? (
                             <Button
                                 type="button"
-                                className="h-10 w-full bg-blue-600 text-white hover:bg-blue-700"
+                                className="h-10 w-full bg-blue-600 text-white hover:bg-blue-700 dark:bg-sky-500 dark:text-slate-950 dark:hover:bg-sky-400"
                                 onClick={onSaveOption}
                             >
                                 Save Option
@@ -96,7 +96,7 @@ export default function SurveyQuestionOptionRow({
 
                 {!allowMultiple && isOptionSaved ? (
                     <div className="space-y-1.5">
-                        <label className="block text-xs font-medium text-slate-600">After child questions, go to:</label>
+                        <label className="block text-xs font-medium text-slate-600 dark:text-slate-300">After child questions, go to:</label>
                         <SurveyBranchingSelect
                             name={branchingFieldName}
                             currentQuestionIndex={questionIndex}

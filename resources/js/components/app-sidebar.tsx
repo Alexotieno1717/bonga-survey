@@ -29,6 +29,7 @@ import contact from '@/routes/contact';
 import contactgroup from '@/routes/contactgroup';
 import contactgroupmaps from '@/routes/contactgroupmaps';
 import questions from '@/routes/questions';
+import { index as surveyAiIndex } from '@/routes/surveys/ai';
 import { index as surveyResponsesIndex } from '@/routes/surveys/responses';
 import type { NavItem } from '@/types';
 import AppLogo from './app-logo';
@@ -51,7 +52,7 @@ const mainNavItems: NavItem[] = [
             },
             {
                 title: 'AI Survey',
-                href: '/surveys/ai',
+                href: surveyAiIndex(),
                 icon: Brain,
             },
             {

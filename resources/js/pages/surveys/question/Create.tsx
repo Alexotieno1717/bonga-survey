@@ -49,6 +49,17 @@ interface PageProps extends InertiaPageProps {
         name: string;
     }>;
     existingTriggerWords: string[];
+    aiDraft?: {
+        survey_name: string;
+        description: string;
+        questions: Array<{
+            question: string;
+            response_type: 'free-text' | 'multiple-choice';
+            options: string[];
+            branching?: string | string[] | null;
+            allow_multiple?: boolean;
+        }>;
+    } | null;
 }
 
 const detailsStepFields = ['surveyName', 'description', 'startDate', 'endDate', 'shortCode', 'triggerWord'];
@@ -63,7 +74,7 @@ export default function Create() {
     const [clientErrors, setClientErrors] = useState<FormErrors>({});
     const [touchedFields, setTouchedFields] = useState<FormTouched>({});
 
-    const { contacts, existingTriggerWords } = usePage<PageProps>().props;
+    const { contacts, existingTriggerWords, aiDraft } = usePage<PageProps>().props;
     const {
         data,
         errors,
@@ -72,6 +83,59 @@ export default function Create() {
         setData,
         transform,
     } = useForm<FormValues>(surveyCreateInitialValues);
+
+    React.useEffect(() => {
+        if (! aiDraft) {
+            return;
+        }
+
+        const nextQuestions = aiDraft.questions.length > 0
+            ? aiDraft.questions.map((question) => {
+                if (question.response_type === 'multiple-choice') {
+                    const branching = Array.isArray(question.branching) ? question.branching : [];
+                    const normalizedBranching = question.options.map((_, index) => {
+                        return branching[index] ?? '0';
+                    });
+                    const allowMultiple = Boolean(question.allow_multiple);
+
+                    return {
+                        question: question.question,
+                        responseType: question.response_type,
+                        options: question.options,
+                        optionSaveStates: question.options.map(() => true),
+                        allowMultiple,
+                        freeTextDescription: '',
+                        isSaved: true,
+                        isEditing: false,
+                        branching: allowMultiple
+                            ? (typeof question.branching === 'string' ? question.branching : '0')
+                            : normalizedBranching,
+                    };
+                }
+
+                return {
+                    question: question.question,
+                    responseType: question.response_type,
+                    options: [],
+                    optionSaveStates: [],
+                    allowMultiple: false,
+                    freeTextDescription: '',
+                    isSaved: true,
+                    isEditing: false,
+                    branching: typeof question.branching === 'string' ? question.branching : '0',
+                };
+            })
+            : surveyCreateInitialValues.questions;
+
+        setChildQuestionStates({});
+        setData((previousValues) => ({
+            ...previousValues,
+            surveyName: aiDraft.survey_name,
+            description: aiDraft.description,
+            createdWithAi: true,
+            questions: nextQuestions,
+        }));
+    }, [aiDraft, setData]);
 
     const normalizeTriggerWord = (value: string): string => value.trim().toLowerCase();
     const isTriggerWordUnique = (value: string): boolean => {
@@ -268,7 +332,7 @@ export default function Create() {
                 ) : null}
 
                 <form
-                    className="bg-white"
+                    className="rounded-2xl bg-transparent"
                     onSubmit={(event) => {
                         event.preventDefault();
                     }}

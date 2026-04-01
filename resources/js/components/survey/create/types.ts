@@ -26,6 +26,7 @@ export interface FormValues {
     isSavingCompletionMessage?: boolean;
     surveyName: string;
     description: string;
+    createdWithAi: boolean;
     startDate: Date | null;
     endDate: Date | null;
     shortCode: string;
