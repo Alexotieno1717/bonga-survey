@@ -1,4 +1,4 @@
-# HTTP Routes Summary
+ # HTTP Routes Summary
 
 This document summarizes the main HTTP endpoints and their purposes. For full details, see route files under `routes/` and their controllers.
 

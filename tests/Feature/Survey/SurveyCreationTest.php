@@ -20,6 +20,9 @@ test('authenticated user can create a survey with questions, options and recipie
     $contacts = Contact::factory()->count(2)->create([
         'user_id' => $user->id,
     ]);
+    $startDate = now()->toDateString();
+    $endDate = now()->addMonth()->toDateString();
+    $scheduleTime = now()->addHour()->seconds(0);
 
     $response = $this
         ->actingAs($user)
@@ -27,12 +30,12 @@ test('authenticated user can create a survey with questions, options and recipie
             'status' => 'active',
             'surveyName' => 'Customer Satisfaction Survey',
             'description' => 'Quarterly customer feedback survey',
-            'startDate' => '2026-02-24',
-            'endDate' => '2026-03-24',
+            'startDate' => $startDate,
+            'endDate' => $endDate,
             'triggerWord' => 'SAT2026',
             'completionMessage' => 'Thanks for your feedback.',
             'invitationMessage' => 'Reply START to participate.',
-            'scheduleTime' => '2026-02-25 10:00:00',
+            'scheduleTime' => $scheduleTime->toDateTimeString(),
             'questions' => [
                 [
                     'question' => 'How do you rate our service?',
@@ -69,7 +72,7 @@ test('authenticated user can create a survey with questions, options and recipie
         $this->assertDatabaseHas('contact_survey', [
             'survey_id' => $survey->id,
             'contact_id' => $contact->id,
-            'sent_at' => '2026-02-25 10:00:00',
+            'sent_at' => $scheduleTime->toDateTimeString(),
         ]);
     }
 });

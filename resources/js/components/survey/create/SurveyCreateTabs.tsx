@@ -14,7 +14,7 @@ export default function SurveyCreateTabs({
     isStep2Complete,
 }: SurveyCreateTabsProps) {
     return (
-        <div className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white p-1 text-muted-foreground dark:border-slate-500/35 dark:bg-slate-900/60">
+        <div className="inline-flex h-10 items-center border border-slate-200 bg-white text-muted-foreground dark:border-slate-500/35 dark:bg-slate-900/60">
             <div
                 className={`inline-flex items-center justify-center border px-3 py-2 text-sm font-medium whitespace-nowrap ring-offset-background transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow ${
                     currentStep === 0
@@ -24,6 +24,7 @@ export default function SurveyCreateTabs({
             >
                 Survey Details
             </div>
+            
 
             <div
                 className={`inline-flex items-center justify-center border px-3 py-2 text-sm font-medium whitespace-nowrap ring-offset-background transition-all focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow ${

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Contact;
+use App\Models\Question;
 use App\Models\Survey;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -31,6 +32,48 @@ test('responses index exposes ai creation flag', function (): void {
             ->has('surveys.data', 2)
             ->where('surveys.data.0.created_with_ai', true)
             ->where('surveys.data.1.created_with_ai', false)
+        );
+});
+
+test('responses index exposes scope and delivery metrics', function (): void {
+    $user = User::factory()->create();
+
+    $survey = Survey::factory()->create([
+        'created_by' => $user->id,
+    ]);
+
+    Question::factory()->count(2)->create([
+        'survey_id' => $survey->id,
+    ]);
+
+    $sentContact = Contact::factory()->create([
+        'user_id' => $user->id,
+    ]);
+
+    $pendingContact = Contact::factory()->create([
+        'user_id' => $user->id,
+    ]);
+
+    $survey->contacts()->attach($sentContact->id, [
+        'sent_at' => now(),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $survey->contacts()->attach($pendingContact->id, [
+        'sent_at' => null,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $this
+        ->actingAs($user)
+        ->get(route('surveys.responses.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('surveys/question/ResponsesIndex')
+            ->where('surveys.data.0.questions_count', 2)
+            ->where('surveys.data.0.contacts_count', 2)
+            ->where('surveys.data.0.sent_recipients_count', 1)
         );
 });
 
